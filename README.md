@@ -8,7 +8,7 @@ pip install -r backend/requirements.txt
 #WINDOWS
 python -m venv venv
 venv\Scripts\activate.bat
-pip install -r requirements.txt
+pip install -r backend\requirements.txt
 ```
 
 # Get VSCODE to recognize the venv
