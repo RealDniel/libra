@@ -13,7 +13,7 @@ pip install -r backend\requirements.txt
 
 # Get VSCODE to recognize the venv
 then in vscode, do cmd + shift + p (or ctrl for windows Don and Sierra)
-Type "Python: Select Interpreter" and select it
+Type "Python: Select Interpreter" and select "Select interpreter path"
 
 then choose:
 ```bash
@@ -25,6 +25,20 @@ backend\venv\bin\python.exe
 ```
 
 # Run the app
+First, you need to get your laptop's IP adress and paste it into frontend/App.js on the line that's like "fetch("http://........")"
+## Get ip adress :
+```bash
+# MAC
+ifconfig | grep "inet "
+
+#Then choose the one that looks like an IP address, should be second line 10.112.idk
+
+
+#WINDOWS
+ipconfig
+
+#Then get ipv4 address
+```
 ## Backend
 ```bash
 cd backend

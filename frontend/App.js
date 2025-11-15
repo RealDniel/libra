@@ -5,7 +5,7 @@ export default function App() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/hello") // your Flask backend
+    fetch("http://*IP ADDRESS HERE*:5000/api/hello") // PASTE YOUR IP ADDRESS IN THE QUOTES HERE
       .then((res) => res.json())
       .then((data) => setMessage(data.message))
       .catch(console.error);
