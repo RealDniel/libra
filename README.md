@@ -15,15 +15,15 @@ backend/venv/bin/python (MAC)
 backend\venv\bin\python.exe (WINDOWS)
 ```
 
-## Run the app
-# Backend
+# Run the app
+## Backend
 ```bash
 cd backend
 source venv/bin/activate
 python app.py
 ```
 
-# Frontend
+## Frontend
 ```bash
 cd frontend
 npm start
