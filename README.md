@@ -34,7 +34,7 @@ or
 expo start
 ```
 
-# It said this when I ran npx create-expo-app frontend
+### It said this when I ran npx create-expo-app frontend
 ```bash
 ✅ Your project is ready!
 
