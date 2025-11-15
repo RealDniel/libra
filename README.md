@@ -1,7 +1,13 @@
 # When you pull this repo, run this
 ```bash
+# MAC
 python3 -m venv venv
 source venv/bin/activate
+pip install -r backend/requirements.txt
+
+#WINDOWS
+python -m venv venv
+venv\Scripts\activate.bat
 pip install -r requirements.txt
 ```
 
@@ -11,8 +17,11 @@ Type "Python: Select Interpreter" and select it
 
 then choose:
 ```bash
-backend/venv/bin/python (MAC)
-backend\venv\bin\python.exe (WINDOWS)
+#MAC
+backend/venv/bin/python
+
+#WINDOWS
+backend\venv\bin\python.exe
 ```
 
 # Run the app
