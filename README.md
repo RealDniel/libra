@@ -1,11 +1,11 @@
-## When you pull this repo, run this
+# When you pull this repo, run this
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Get VSCODE to recognize the venv
+# Get VSCODE to recognize the venv
 then in vscode, do cmd + shift + p (or ctrl for windows Don and Sierra)
 Type "Python: Select Interpreter" and select it
 
@@ -34,7 +34,7 @@ or
 expo start
 ```
 
-## It said this when I ran npx create-expo-app frontend
+# It said this when I ran npx create-expo-app frontend
 ```bash
 ✅ Your project is ready!
 
