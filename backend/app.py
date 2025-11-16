@@ -11,6 +11,7 @@ except Exception:
     pass
 
 from services.transcription import transcribe_audio
+from fallacmodel import analyze_audio_to_json, generate_json_from_text
 from factchecker import FactCheckerAgent
 import traceback
 
@@ -41,6 +42,46 @@ def transcribe():
         return jsonify({"error": str(ve)}), 400
     except Exception:
         return jsonify({"error": "Transcription failed"}), 500
+
+# Transcribe audio and run through fine-tuned model, return JSON
+@app.route("/api/analyze_audio", methods=["POST"])
+def analyze_audio():
+    if "audio" not in request.files:
+        return jsonify({"error": "Missing 'audio' file in form-data"}), 400
+
+    audio_file = request.files["audio"]
+    if audio_file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
+
+    try:
+        audio_bytes = audio_file.read()
+        mime_type = audio_file.mimetype or "application/octet-stream"
+        result_json = analyze_audio_to_json(audio_bytes=audio_bytes, mime_type=mime_type)
+        return jsonify(result_json)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except RuntimeError as re:
+        # Typically JSON parsing or API response issues
+        return jsonify({"error": str(re)}), 422
+    except Exception:
+        return jsonify({"error": "Model analysis failed"}), 500
+
+# Send plain text directly to fine-tuned model, return JSON
+@app.route("/api/analyze_text", methods=["POST"])
+def analyze_text():
+    data = request.get_json(silent=True) or {}
+    text = data.get("text")
+    if not text:
+        return jsonify({"error": "Missing 'text' in JSON body"}), 400
+    try:
+        result_json = generate_json_from_text(text)
+        return jsonify(result_json)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except RuntimeError as re:
+        return jsonify({"error": str(re)}), 422
+    except Exception:
+        return jsonify({"error": "Model analysis failed"}), 500
 
 # Fact checker function
 @app.route("/api/factcheck", methods=["POST"])
