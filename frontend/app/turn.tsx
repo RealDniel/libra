@@ -20,7 +20,7 @@ import { Audio } from 'expo-av';
 import getBackendBaseUrl from '@/constants/network';
 
 export default function TurnScreen() {
-  // Zustand store selectors
+  // Zustand store selectors - MUST be called before any conditional returns
   const currentTurn = useDebateStore((state) => state.currentTurn);
   const updateTimer = useDebateStore((state) => state.updateTimer);
   const setRecording = useDebateStore((state) => state.setRecording);
@@ -40,34 +40,36 @@ export default function TurnScreen() {
   const [uploading, setUploadingLocal] = useState(false);
   const pathname = usePathname();
 
-  // Early return if no turn
-  if (!currentTurn) {
-    router.replace('/');
-    return null;
-  }
-
-  // Derived values
-  const speakerNum = currentTurn.speaker === 'A' ? 1 : 2;
-  const colors = currentTurn.speaker === 'A' ? DebateColors.speaker1 : DebateColors.speaker2;
-  const speakerName = currentTurn.speaker === 'A' 
+  // Derived values (before hooks, with null checks)
+  const speakerNum = currentTurn?.speaker === 'A' ? 1 : 2;
+  const colors = currentTurn?.speaker === 'A' ? DebateColors.speaker1 : DebateColors.speaker2;
+  const speakerName = currentTurn?.speaker === 'A' 
     ? (speakerNames?.A || 'Speaker A')
     : (speakerNames?.B || 'Speaker B');
-  const isRecording = currentTurn.status === 'recording';
-  const isIdle = currentTurn.status === 'idle';
+  const isRecording = currentTurn?.status === 'recording';
+  const isIdle = currentTurn?.status === 'idle';
   const isBusy = uploading || isRecording;
-
-  // Debug logging
-  useEffect(() => {
-    console.log('📊 Turn status changed:', currentTurn.status);
-    console.log('⏱️ Time remaining:', currentTurn.timeRemaining);
-    console.log('🎙️ isRecording:', isRecording, 'isIdle:', isIdle);
-  }, [currentTurn.status, currentTurn.timeRemaining, isRecording, isIdle]);
-
-  // Format time as mm:ss
   const timeRemaining = currentTurn?.timeRemaining ?? 0;
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
   const timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+  // Redirect when no current turn (in useEffect, not during render)
+  useEffect(() => {
+    if (!currentTurn && pathname === '/turn') {
+      const timer = setTimeout(() => router.replace('/'), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [currentTurn, pathname]);
+
+  // Debug logging
+  useEffect(() => {
+    if (currentTurn) {
+      console.log('📊 Turn status changed:', currentTurn.status);
+      console.log('⏱️ Time remaining:', currentTurn.timeRemaining);
+      console.log('🎙️ isRecording:', isRecording, 'isIdle:', isIdle);
+    }
+  }, [currentTurn?.status, currentTurn?.timeRemaining, isRecording, isIdle]);
 
   // Pulse animation for recording
   useEffect(() => {
@@ -89,7 +91,7 @@ export default function TurnScreen() {
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isRecording]);
+  }, [isRecording, pulseAnim]);
 
   // Fade in animation
   useEffect(() => {
@@ -98,14 +100,7 @@ export default function TurnScreen() {
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, []);
-
-  // Redirect when no current turn (must occur in an effect, not during render)
-  useEffect(() => {
-    if (pathname === '/turn' && !currentTurn) {
-      router.replace('/');
-    }
-  }, [pathname, currentTurn]);
+  }, [fadeAnim]);
 
   // Timer countdown
   useEffect(() => {
@@ -123,7 +118,14 @@ export default function TurnScreen() {
         clearInterval(timerInterval.current);
       }
     };
-  }, [isRecording, timeRemaining]);
+  }, [isRecording, timeRemaining, updateTimer]);
+
+  // Don't render anything if no current turn (ALL HOOKS MUST BE ABOVE THIS)
+  if (!currentTurn) {
+    return (
+      <View style={{ flex: 1, backgroundColor: DebateColors.background.primary }} />
+    );
+  }
 
   const handleMicPress = () => {
     if (isIdle) {

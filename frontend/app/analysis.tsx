@@ -62,7 +62,9 @@ export default function AnalysisScreen() {
   // Only redirect to home if this screen is focused AND we're not in a completed session
   useEffect(() => {
     if (pathname === '/analysis' && !currentTurn && session?.status !== 'completed') {
-      router.replace('/');
+      // Defer navigation to next tick to ensure Root Layout is mounted
+      const timer = setTimeout(() => router.replace('/'), 0);
+      return () => clearTimeout(timer);
     }
   }, [pathname, currentTurn, session?.status]);
 

@@ -34,11 +34,21 @@ def transcribe():
         return jsonify({"error": "Empty filename"}), 400
 
     try:
-        transcript = transcribe_audio(file.read(), mime_type=file.mimetype or "audio/wav")
-        return jsonify({"transcript": transcript})
-    except Exception:
+      audio_bytes = file.read()
+      mime_type = file.mimetype or "application/octet-stream"
+      print(f"\n🎤 Transcribing audio: {len(audio_bytes)} bytes, type: {mime_type}")
+
+      transcript = transcribe_audio(audio_bytes=audio_bytes, mime_type=mime_type)
+      print(f"✅ Transcription successful: {transcript[:100]}...")
+      return jsonify({"transcript": transcript})
+    except ValueError as ve:
+        print(f"❌ Transcription validation error: {ve}")
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        print(f"❌ Transcription failed: {e}")
         traceback.print_exc()
-        return jsonify({"error": "Transcription failed"}), 500
+        return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
+
 
 # -------------------- Analyze Audio --------------------
 @app.route("/api/analyze_audio", methods=["POST"])
