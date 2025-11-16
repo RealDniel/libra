@@ -3,6 +3,7 @@
  */
 
 import { create } from 'zustand';
+import { router } from 'expo-router';
 import type {
   DebateSession,
   CurrentTurn,
@@ -196,6 +197,8 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
         currentTurn: null,
       };
     });
+    // Navigate to summary after marking the session completed
+    router.push('/summary');
   },
 
   // Reset everything
