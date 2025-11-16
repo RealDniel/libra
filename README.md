@@ -25,37 +25,23 @@ backend\venv\bin\python.exe
 ```
 
 # Run the app
-First, you need to get your laptop's IP adress and paste it into frontend/App.js on the line that's like "fetch("http://........")"
-## Get ip adress :
-```bash
-# MAC
-ifconfig | grep "inet "
-
-#Then choose the one that looks like an IP address, should be second line 10.112.idk
-
-
-#WINDOWS
-ipconfig
-
-#Then get ipv4 address
-```
 ## Backend
 ```bash
 cd backend
 source venv/bin/activate
 python app.py
 ```
+## Update your frontend adress
+When you run the backend, its gonna say "Running on http:......." copy the adress and paste it into frontend/App.js on the line that's like "fetch("http://........")"
 
 ## Frontend
 ```bash
 cd frontend
 npm start
 ```
-or
 
-```bash
-expo start
-```
+## Open the app
+Scan the QR code with your phone after downloading Expo Go from app store
 
 ### It said this when I ran npx create-expo-app frontend
 ```bash
