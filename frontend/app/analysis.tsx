@@ -14,17 +14,18 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
 
 const { width } = Dimensions.get('window');
 
 export default function AnalysisScreen() {
-  const { currentTurn, completeTurn, nextSpeaker, endDebate } = useDebateStore();
+  const { currentTurn, completeTurn, nextSpeaker, endDebate, session } = useDebateStore();
   const slideAnim = useRef(new Animated.Value(50)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const gradientAnim = useRef(new Animated.Value(0)).current;
+  const pathname = usePathname();
 
   useEffect(() => {
     // Entrance animations
@@ -58,8 +59,14 @@ export default function AnalysisScreen() {
     ).start();
   }, []);
 
+  // Only redirect to home if this screen is focused AND we're not in a completed session
+  useEffect(() => {
+    if (pathname === '/analysis' && !currentTurn && session?.status !== 'completed') {
+      router.replace('/');
+    }
+  }, [pathname, currentTurn, session?.status]);
+
   if (!currentTurn) {
-    router.replace('/');
     return null;
   }
 
@@ -91,6 +98,34 @@ export default function AnalysisScreen() {
     if (v === 'misleading') return 'MISLEADING';
     return 'UNCERTAIN';
   };
+  // Mock data for now (Phase 5 will use real data)
+  const mockFallacies = [
+    {
+      id: '1',
+      type: 'Ad Hominem',
+      explanation: 'Attack on character rather than argument',
+    },
+    {
+      id: '2',
+      type: 'Straw Man',
+      explanation: "Misrepresenting opponent's position",
+    },
+  ];
+
+  const mockFactChecks: { id: string; claim: string; verdict: 'true' | 'false' | 'uncertain'; explanation: string }[] = [
+    {
+      id: '1',
+      claim: 'This has never been tried before',
+      verdict: 'uncertain' as const,
+      explanation: 'Similar policies exist but with different implementations',
+    },
+    {
+      id: '2',
+      claim: 'Studies show this policy works in other countries',
+      verdict: 'true' as const,
+      explanation: 'Verified by multiple peer-reviewed studies',
+    },
+  ];
 
   const speakerColors =
     currentTurn.speaker === 'A'
