@@ -8,5 +8,8 @@ frontend/node_modules/
 frontend/.expo/
 frontend/.expo-shared/
 
+#env
+.env
+
 # Mac
 .DS_Store
