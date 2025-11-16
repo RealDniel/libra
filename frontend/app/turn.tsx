@@ -17,6 +17,7 @@ import { router, usePathname } from 'expo-router';
 import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
 import { Audio } from 'expo-av';
+import getBackendBaseUrl from '@/constants/network';
 
 export default function TurnScreen() {
   // Zustand store selectors
@@ -161,32 +162,10 @@ export default function TurnScreen() {
           staysActiveInBackground: false,
         });
       }
+      // Use Expo's recommended recording preset to avoid platform-specific format issues.
+      // This uses sane defaults for iOS/Android and prevents NSOSStatusErrorDomain prepare errors.
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync({
-        android: {
-          extension: '.m4a',
-          outputFormat: 2,
-          audioEncoder: 3,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-        },
-        ios: {
-          extension: '.m4a',
-          outputFormat: 'mpeg4aac',
-          audioQuality: 127,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
-        },
-      });
+      await recording.prepareToRecordAsync((Audio as any).RECORDING_OPTIONS_PRESET_HIGH_QUALITY as any);
       await recording.startAsync();
       recordingRef.current = recording;
       console.log('✅ Recording started, updating store...');
@@ -226,7 +205,7 @@ export default function TurnScreen() {
       
       // Web vs Native file upload handling
       let res: Response;
-      const backendUrl = 'http://localhost:5001/api/transcribe';
+      const backendUrl = `${getBackendBaseUrl()}/api/transcribe`;
       console.log('📡 Uploading to:', backendUrl);
       
       if (Platform.OS === 'web' && uri) {
@@ -299,7 +278,7 @@ export default function TurnScreen() {
 
   const analyzeFallacies = async (text: string, speaker: 'A' | 'B') => {
     try {
-      const res = await fetch('http://localhost:5001/api/fallacies', {
+      const res = await fetch(`${getBackendBaseUrl()}/api/fallacies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: text, speaker }),
@@ -316,7 +295,7 @@ export default function TurnScreen() {
 
   const factcheckTranscript = async (text: string) => {
     try {
-      const res = await fetch('http://localhost:5001/api/factcheck', {
+      const res = await fetch(`${getBackendBaseUrl()}/api/factcheck`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
