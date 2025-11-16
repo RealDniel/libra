@@ -21,9 +21,14 @@ interface DebateStore {
   // Config
   turnDurationSeconds: number;
 
+  // Speaker names (optional)
+  speakerNames?: { A?: string; B?: string } | null;
+
   // Actions
   startDebate: () => void;
-  startTurn: (speaker: Speaker) => void;
+  startTurn: (speaker: Speaker, durationSeconds?: number, names?: { A?: string; B?: string }) => void;
+  setTurnDuration?: (seconds: number) => void;
+  setSpeakerNames?: (names: { A?: string; B?: string }) => void;
   updateTimer: (timeRemaining: number) => void;
   setRecording: (isRecording: boolean, audioUri?: string) => void;
   setUploading: () => void;
@@ -40,6 +45,7 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
   // Initial state
   session: null,
   currentTurn: null,
+  speakerNames: { A: 'Speaker A', B: 'Speaker B' },
   turnDurationSeconds: 60,
 
   // Start a new debate session
@@ -55,14 +61,31 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
     });
   },
 
+  // Set turn duration (seconds)
+  setTurnDuration: (seconds: number) => {
+    set({ turnDurationSeconds: seconds });
+  },
+
+  // Set speaker display names
+  setSpeakerNames: (names: { A?: string; B?: string }) => {
+    set((state) => ({ speakerNames: { ...(state.speakerNames || {}), ...names } }));
+  },
+
   // Start a new turn for a speaker
-  startTurn: (speaker: Speaker) => {
+  startTurn: (speaker: Speaker, durationSeconds?: number, names?: { A?: string; B?: string }) => {
     const { turnDurationSeconds } = get();
+    const duration = durationSeconds ?? turnDurationSeconds;
+
+    // Optionally update speaker names for this session
+    if (names && Object.keys(names).length) {
+      set((state) => ({ speakerNames: { ...(state.speakerNames || {}), ...names } }));
+    }
+
     set({
       currentTurn: {
         speaker,
         status: 'idle',
-        timeRemaining: turnDurationSeconds,
+        timeRemaining: duration,
         startedAt: new Date(),
       },
     });

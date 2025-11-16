@@ -17,13 +17,18 @@ import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
 
 export default function TurnScreen() {
-  const { currentTurn, updateTimer, setRecording } = useDebateStore();
+  const { currentTurn, updateTimer, setRecording, speakerNames } = useDebateStore();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const pathname = usePathname();
 
   const speakerNum = currentTurn?.speaker === 'A' ? 1 : 2;
+  if (!currentTurn) {
+    router.replace('/');
+    return null;
+  }
+
   const colors =
     currentTurn?.speaker === 'A'
       ? DebateColors.speaker1
@@ -31,6 +36,13 @@ export default function TurnScreen() {
 
   const isRecording = currentTurn?.status === 'recording';
   const isIdle = currentTurn?.status === 'idle';
+  // Get the speaker name from store, with fallback
+  const speakerName = currentTurn.speaker === 'A' 
+    ? (speakerNames?.A || 'Speaker A')
+    : (speakerNames?.B || 'Speaker B');
+
+  const isRecording = currentTurn.status === 'recording';
+  const isIdle = currentTurn.status === 'idle';
 
   // Format time as mm:ss
   const timeRemaining = currentTurn?.timeRemaining ?? 0;
@@ -122,7 +134,7 @@ export default function TurnScreen() {
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.speakerTitle}>Speaker {speakerNum}</Text>
+            <Text style={styles.speakerTitle}>{speakerName}</Text>
             <Animated.Text
               style={[
                 styles.timer,
@@ -296,4 +308,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 });
-
