@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mock STT Client</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; line-height: 1.5; }
+      .row { margin-bottom: 16px; }
+      label { display: block; font-weight: 600; margin-bottom: 6px; }
+      input[type="text"] { width: 100%; max-width: 560px; padding: 8px; }
+      input[type="file"] { padding: 4px; }
+      button { padding: 8px 12px; margin-right: 8px; cursor: pointer; }
+      #transcript { white-space: pre-wrap; border: 1px solid #ddd; padding: 12px; border-radius: 6px; background: #fafafa; max-width: 720px; }
+      #log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #555; white-space: pre-wrap; }
+      .muted { color: #666; font-size: 12px; }
+      .danger { color: #b00020; }
+      .success { color: #0a7a3b; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eee; margin-left: 8px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Mock ElevenLabs STT Client</h1>
+    <p class="muted">Independent test page to send audio to your backend <code>/api/transcribe</code> endpoint.</p>
+
+    <div class="row">
+      <label for="backendUrl">Backend URL</label>
+      <input id="backendUrl" type="text" value="http://localhost:5001/api/transcribe" />
+    </div>
+
+    <div class="row">
+      <label for="audioFile">Select audio file</label>
+      <input id="audioFile" type="file" accept="audio/*" />
+      <div class="muted">Recommended formats: m4a, wav, mp3, flac</div>
+    </div>
+
+    <div class="row">
+      <button id="sendBtn">Upload & Transcribe</button>
+      <span id="uploadStatus" class="pill">idle</span>
+    </div>
+
+    <hr />
+
+    <h2>Optional: Record in Browser</h2>
+    <div class="row">
+      <button id="recordBtn">Start Recording</button>
+      <button id="stopBtn" disabled>Stop</button>
+      <span id="recStatus" class="pill">stopped</span>
+    </div>
+    <div class="row">
+      <audio id="preview" controls></audio>
+    </div>
+    <div class="row">
+      <button id="sendRecordedBtn" disabled>Send Recorded Audio</button>
+      <span class="muted">Note: Browser recording uses <code>audio/webm</code>. If the API rejects it, use file upload instead.</span>
+    </div>
+
+    <hr />
+
+    <h2>Transcript</h2>
+    <div id="transcript">No transcript yet</div>
+
+    <h3>Log</h3>
+    <div id="log"></div>
+
+    <script src="./main.js"></script>
+  </body>
+  </html>
+
+
