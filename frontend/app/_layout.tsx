@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="turn" />
         <Stack.Screen name="analysis" />
         <Stack.Screen name="summary" />
+        <Stack.Screen name="history" />
       </Stack>
       <StatusBar style="light" />
     </>
