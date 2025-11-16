@@ -61,6 +61,8 @@ export interface CurrentTurn {
   startedAt?: Date;
   audioUri?: string;
   transcript?: string;
+  fallacies?: Fallacy[];
+  factChecks?: FactCheck[];
   error?: string;
 }
 
