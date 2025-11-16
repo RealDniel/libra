@@ -36,12 +36,18 @@ def transcribe():
     try:
         audio_bytes = audio_file.read()
         mime_type = audio_file.mimetype or "application/octet-stream"
+        print(f"\n🎤 Transcribing audio: {len(audio_bytes)} bytes, type: {mime_type}")
         transcript = transcribe_audio(audio_bytes=audio_bytes, mime_type=mime_type)
+        print(f"✅ Transcription successful: {transcript[:100]}...")
         return jsonify({"transcript": transcript})
     except ValueError as ve:
+        print(f"❌ Transcription validation error: {ve}")
         return jsonify({"error": str(ve)}), 400
-    except Exception:
-        return jsonify({"error": "Transcription failed"}), 500
+    except Exception as e:
+        print(f"❌ Transcription failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
 
 # Transcribe audio and run through fine-tuned model, return JSON
 @app.route("/api/analyze_audio", methods=["POST"])
