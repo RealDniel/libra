@@ -219,7 +219,13 @@ class SnowflakeService:
                 # Insert fact checks for this turn
                 for fact_check in turn.get('fact_checks', []):
                     fact_check_id = fact_check.get('id') or f"{turn_id}_fact_{hash(fact_check.get('claim'))}"
-                    sources_json = json.dumps(fact_check.get('sources', []))
+                    sources = fact_check.get('sources')
+                    
+                    # Handle None/null sources properly
+                    if sources is None or sources == []:
+                        sources_json = '[]'
+                    else:
+                        sources_json = json.dumps(sources)
                     
                     cursor.execute("""
                         INSERT INTO fact_checks (

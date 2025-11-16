@@ -158,9 +158,6 @@ export default function AnalysisScreen() {
             <Text style={styles.headerTitle}>Speaker {speakerNum}</Text>
             <Text style={styles.headerSubtitle}>Analysis Complete</Text>
           </View>
-          <View style={[styles.speakerBadge, { backgroundColor: speakerColors.primary }]}>
-            <Text style={styles.badgeNumber}>{speakerNum}</Text>
-          </View>
         </View>
       </Animated.View>
 

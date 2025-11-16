@@ -230,7 +230,7 @@ export default function SummaryScreen() {
               ]}
             >
               <LinearGradient
-                colors={['#B81D1D', '#780C0C', '#B81D1D']}
+                colors={['#1D1DB8', '#0C1778', '#1D1DB8']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
@@ -336,7 +336,7 @@ export default function SummaryScreen() {
               ]}
             >
               <LinearGradient
-                colors={['#1D1DB8', '#0C1778', '#1D1DB8']}
+                colors={['#B81D1D', '#780C0C', '#B81D1D']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
