@@ -266,18 +266,57 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
   },
 
   // End the debate
-  endDebate: () => {
-    set((state) => {
-      if (!state.session) return state;
-      return {
-        session: {
-          ...state.session,
-          status: 'completed',
-          completedAt: new Date(),
-        },
-        currentTurn: null,
-      };
+  endDebate: async () => {
+    const state = get();
+    if (!state.session) return;
+    
+    // Mark session as completed
+    set({
+      session: {
+        ...state.session,
+        status: 'completed',
+        completedAt: new Date(),
+      },
+      currentTurn: null,
     });
+    
+    // Auto-save debate to database
+    try {
+      const debateData = {
+        debate_id: state.session.id,
+        topic: 'Debate Session', // You can make this configurable
+        speaker_a: state.speakerNames?.A || 'Speaker A',
+        speaker_b: state.speakerNames?.B || 'Speaker B',
+        turns: state.session.turns.map(turn => ({
+          turn_id: turn.id,
+          turn_number: turn.turnNumber,
+          speaker: turn.speaker,
+          transcript: turn.transcript || '',
+          duration: turn.duration || 0,
+          fallacies: turn.fallacies || [],
+          fact_checks: turn.factChecks || [],
+        })),
+        summary: `Debate with ${state.session.turns.length} turns completed.`,
+      };
+      
+      console.log('💾 Saving debate to database...', debateData.debate_id);
+      const res = await fetch('http://localhost:5001/api/save_debate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(debateData),
+      });
+      
+      if (res.ok) {
+        const result = await res.json();
+        console.log('✅ Debate saved successfully:', result);
+      } else {
+        console.warn('⚠️ Failed to save debate:', await res.text());
+      }
+    } catch (error) {
+      console.error('❌ Error saving debate:', error);
+      // Don't block navigation on save failure
+    }
+    
     // Navigate to summary after marking the session completed
     router.push('/summary');
   },

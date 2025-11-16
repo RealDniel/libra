@@ -1,6 +1,5 @@
 /**
- * Libra - Enhanced Home Screen
- * Deep purple theme representing the blend of blue (Speaker A) and red (Speaker B)
+ * Libra - Landing Page with History Button
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -18,39 +17,37 @@ import {
 import { router } from 'expo-router';
 import { useDebateStore } from '@/store/debateStore';
 
-// Enhanced deep purple color scheme
 const Colors = {
   background: {
-    primary: '#0a0515',      // Deep dark purple
-    secondary: '#1a1228',    // Rich purple
-    tertiary: '#2a1f3d',     // Medium purple
+    primary: '#0a0515',
+    secondary: '#1a1228',
+    tertiary: '#2a1f3d',
   },
   purple: {
-    main: '#7c3aed',         // Vibrant purple
-    light: '#a78bfa',        // Light purple
-    dark: '#5b21b6',         // Dark purple
+    main: '#7c3aed',
+    light: '#a78bfa',
+    dark: '#5b21b6',
     glow: 'rgba(124, 58, 237, 0.4)',
   },
   accent: {
-    blue: '#3b82f6',         // Speaker A color
-    red: '#ef4444',          // Speaker B color
+    blue: '#3b82f6',
+    red: '#ef4444',
   },
   text: {
-    primary: '#f8fafc',      // White
-    secondary: '#cbd5e1',    // Light gray
-    tertiary: '#94a3b8',     // Medium gray
+    primary: '#f8fafc',
+    secondary: '#cbd5e1',
+    tertiary: '#94a3b8',
   },
 };
 
 export default function HomeScreen() {
   const store = useDebateStore();
-  const [speakingTime, setSpeakingTime] = useState(2); // Default 2 minutes
+  const [speakingTime, setSpeakingTime] = useState(2);
   const [speakerAName, setSpeakerAName] = useState('Speaker A');
   const [speakerBName, setSpeakerBName] = useState('Speaker B');
-  const [editingModal, setEditingModal] = useState(null); // 'A' or 'B' or null
+  const [editingModal, setEditingModal] = useState(null);
   const [tempName, setTempName] = useState('');
   
-  // Animation references
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
@@ -59,7 +56,6 @@ export default function HomeScreen() {
   const orb2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Logo entrance animation
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
@@ -74,7 +70,6 @@ export default function HomeScreen() {
       }),
     ]).start();
 
-    // Gentle floating effect
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
@@ -90,7 +85,6 @@ export default function HomeScreen() {
       ])
     ).start();
 
-    // Subtle pulse on button
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -106,7 +100,6 @@ export default function HomeScreen() {
       ])
     ).start();
 
-    // Orbiting background elements
     Animated.loop(
       Animated.timing(orb1, {
         toValue: 1,
@@ -126,94 +119,23 @@ export default function HomeScreen() {
 
   const handleNewDebate = () => {
     store.reset();
-    
-    // Set speaker names in the store if the methods exist
     if (store.setSpeakerNames) {
       store.setSpeakerNames({ A: speakerAName, B: speakerBName });
     }
-    
-    // Set turn duration if the method exists (convert minutes to seconds)
     if (store.setTurnDuration) {
       store.setTurnDuration(speakingTime * 60);
     }
-    
-    // Alternative: If your store doesn't have these methods, you might need to pass them differently
-    // For example, the store might expect these in startTurn or startDebate
     store.startDebate();
     store.startTurn('A', speakingTime * 60, speakerAName, speakerBName);
-    
     router.push('/turn');
   };
 
-  // TEST MODE: Create mock debate and go to summary
-  const handleTestSummary = () => {
-    store.reset();
-    if (store.setSpeakerNames) {
-      store.setSpeakerNames({ A: speakerAName, B: speakerBName });
-    }
-    store.startDebate();
-    
-    // Create mock turn 1 (Speaker A)
-    store.startTurn('A', 120, speakerAName, speakerBName);
-    store.setTranscript("Climate change is a hoax invented by China. Everyone knows this.");
-    store.setAnalysis(
-      [
-        {
-          id: '1',
-          type: 'Ad Hominem',
-          quote: 'Climate change is a hoax invented by China',
-          explanation: 'This statement contains ad hominem, which undermines logical reasoning.',
-          confidence: 0.95,
-        }
-      ],
-      [
-        {
-          id: '1',
-          claim: 'Climate change is a hoax invented by China',
-          verdict: 'false',
-          explanation: 'This claim is false. Climate change is supported by overwhelming scientific consensus.',
-          confidence: 95,
-        }
-      ]
-    );
-    store.completeTurn();
-    
-    // Create mock turn 2 (Speaker B)
-    store.nextSpeaker();
-    store.setTranscript("The Earth is flat and NASA is lying to us all.");
-    store.setAnalysis(
-      [
-        {
-          id: '2',
-          type: 'Appeal To Emotion',
-          quote: 'NASA is lying to us all',
-          explanation: 'This statement contains appeal to emotion, which undermines logical reasoning.',
-          confidence: 0.88,
-        }
-      ],
-      [
-        {
-          id: '2',
-          claim: 'The Earth is flat',
-          verdict: 'false',
-          explanation: 'The Earth is an oblate spheroid, confirmed by centuries of scientific observation.',
-          confidence: 99,
-        }
-      ]
-    );
-    store.completeTurn();
-    
-    // End debate and go to summary
-    store.endDebate();
-    router.push('/summary');
-  };
-
   const incrementTime = () => {
-    setSpeakingTime(prev => Math.min(prev + 1, 99)); // Max 99 minutes
+    setSpeakingTime(prev => Math.min(prev + 1, 99));
   };
 
   const decrementTime = () => {
-    setSpeakingTime(prev => Math.max(prev - 1, 1)); // Min 1 minute
+    setSpeakingTime(prev => Math.max(prev - 1, 1));
   };
 
   const handleEditSpeaker = (speaker) => {
@@ -250,7 +172,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Animated background orbs */}
       <View style={styles.backgroundElements}>
         <Animated.View
           style={[
@@ -270,7 +191,6 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.content}>
-        {/* Header section */}
         <Animated.View
           style={[
             styles.header,
@@ -280,7 +200,6 @@ export default function HomeScreen() {
             },
           ]}
         >
-          {/* Logo with glow effect */}
           <Animated.View
             style={[
               styles.logoContainer,
@@ -295,7 +214,6 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          {/* Title with underline */}
           <View style={styles.titleContainer}>
             <Text style={styles.title}>Libra</Text>
             <View style={styles.titleUnderline} />
@@ -305,21 +223,6 @@ export default function HomeScreen() {
             Real-time debate analysis & fact-checking
           </Text>
 
-          {/* History Button - positioned after subtitle */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.historyButtonTop,
-              pressed && styles.historyButtonTopPressed,
-            ]}
-            onPress={() => {
-              console.log('📚 History button clicked!');
-              router.push('/history');
-            }}
-          >
-            <Text style={styles.historyButtonTopText}>📚 View History</Text>
-          </Pressable>
-
-          {/* Feature badges showing speaker colors - now tappable */}
           <View style={styles.featureContainer}>
             <Pressable
               style={({ pressed }) => [
@@ -346,10 +249,8 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* Time selector section */}
           <View style={styles.timeInputContainer}>
             <View style={styles.timeSelectorWrapper}>
-              {/* Decrement button */}
               <Pressable
                 style={({ pressed }) => [
                   styles.arrowButton,
@@ -360,12 +261,10 @@ export default function HomeScreen() {
                 <Text style={styles.arrowText}>◀</Text>
               </Pressable>
 
-              {/* Time display */}
               <View style={styles.timeDisplay}>
                 <Text style={styles.timeNumber}>{speakingTime}</Text>
               </View>
 
-              {/* Increment button */}
               <Pressable
                 style={({ pressed }) => [
                   styles.arrowButton,
@@ -381,25 +280,19 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
 
-        {/* Button section */}
-        <Animated.View
-          style={[styles.bottomSection, { opacity: fadeAnim }]}
-        >
-          {/* Start New Debate Button */}
+        {/* ========== BUTTONS SECTION ========== */}
+        <Animated.View style={[styles.bottomSection, { opacity: fadeAnim }]}>
+          
+          {/* PRIMARY: Start New Debate */}
           <Pressable
             style={({ pressed }) => [
-              styles.button,
+              styles.primaryButton,
               pressed && styles.buttonPressed,
             ]}
             onPress={handleNewDebate}
           >
-            <Animated.View
-              style={[
-                styles.buttonInner,
-                { transform: [{ scale: pulseAnim }] },
-              ]}
-            >
-              <Text style={styles.buttonText}>Start New Debate</Text>
+            <Animated.View style={[styles.buttonInner, { transform: [{ scale: pulseAnim }] }]}>
+              <Text style={styles.primaryButtonText}>Start New Debate</Text>
               <View style={styles.buttonIcon}>
                 <Text style={styles.buttonIconText}>→</Text>
               </View>
@@ -407,17 +300,27 @@ export default function HomeScreen() {
             <View style={styles.buttonGlow} />
           </Pressable>
 
-          {/* Beta tag and version */}
+          {/* SECONDARY: View History */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.historyButton,
+              pressed && styles.historyButtonPressed,
+            ]}
+            onPress={() => {
+              console.log('📚 History button clicked!');
+              router.push('/history');
+            }}
+          >
+            <Text style={styles.historyButtonText}>📚 View History</Text>
+          </Pressable>
+
+          {/* Beta Tag */}
           <View style={styles.betaContainer}>
-            <Pressable
-              style={styles.betaTag}
-              onLongPress={handleTestSummary}
-              delayLongPress={2000}
-            >
+            <View style={styles.betaTag}>
               <View style={styles.betaDot} />
               <Text style={styles.betaText}>BETA</Text>
-            </Pressable>
-            <Text style={styles.versionText}>Version 1.0 · Hold BETA to test</Text>
+            </View>
+            <Text style={styles.versionText}>Version 1.0</Text>
           </View>
         </Animated.View>
       </View>
@@ -556,27 +459,7 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
     textAlign: 'center',
     letterSpacing: 1,
-    marginBottom: 20,
-  },
-  historyButtonTop: {
-    backgroundColor: Colors.background.secondary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.purple.main,
-    marginBottom: 28,
-    alignSelf: 'center',
-  },
-  historyButtonTopPressed: {
-    backgroundColor: Colors.background.tertiary,
-    transform: [{ scale: 0.98 }],
-  },
-  historyButtonTopText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.purple.light,
-    letterSpacing: 0.5,
+    marginBottom: 32,
   },
   featureContainer: {
     flexDirection: 'row',
@@ -676,22 +559,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 6,
   },
-  timeDescription: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: Colors.text.tertiary,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
+  
+  // ========== BUTTONS SECTION ==========
   bottomSection: {
     width: '100%',
     alignItems: 'center',
-    paddingBottom: 20,
+    gap: 16,
   },
-  button: {
+  primaryButton: {
     width: '100%',
     position: 'relative',
-    marginBottom: 24,
   },
   buttonInner: {
     width: '100%',
@@ -711,11 +588,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 15,
   },
-  buttonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  buttonText: {
+  primaryButtonText: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.text.primary,
@@ -746,29 +619,39 @@ const styles = StyleSheet.create({
     zIndex: -1,
     transform: [{ scale: 1.1 }],
   },
-  // History button styles - NEW
+  buttonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  
+  // HISTORY BUTTON - CLEARLY DEFINED
   historyButton: {
     width: '100%',
     backgroundColor: Colors.background.secondary,
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
-    marginTop: 8,
-    borderWidth: 2,
-    borderColor: Colors.purple.main,
+    borderWidth: 1,
+    borderColor: Colors.background.tertiary,
+    marginBottom: 8,
+  },
+  historyButtonPressed: {
+    opacity: 0.8,
+    backgroundColor: Colors.background.tertiary,
   },
   historyButtonText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: Colors.purple.light,
+    color: Colors.text.secondary,
     letterSpacing: 0.5,
   },
+  
   betaContainer: {
     alignItems: 'center',
     gap: 8,
+    marginTop: 8,
   },
   betaTag: {
     flexDirection: 'row',
@@ -799,6 +682,7 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
     letterSpacing: 1,
   },
+  
   // Modal styles
   modalOverlay: {
     flex: 1,
