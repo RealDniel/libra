@@ -18,6 +18,7 @@ export interface Fallacy {
   confidence: number;
   explanation: string;
   textSegment?: string;
+  quote?: string; // The actual sentence containing the fallacy
 }
 
 export interface FactCheck {

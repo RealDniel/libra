@@ -19,6 +19,7 @@ import { useDebateStore } from '@/store/debateStore';
 import { Audio } from 'expo-av';
 
 export default function TurnScreen() {
+  // Zustand store selectors
   const currentTurn = useDebateStore((state) => state.currentTurn);
   const updateTimer = useDebateStore((state) => state.updateTimer);
   const setRecording = useDebateStore((state) => state.setRecording);
@@ -26,35 +27,30 @@ export default function TurnScreen() {
   const setTranscript = useDebateStore((state) => state.setTranscript);
   const setError = useDebateStore((state) => state.setError);
   const setAnalysis = useDebateStore((state) => state.setAnalysis);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const timerInterval = useRef<NodeJS.Timeout | null>(null);
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const [uploading, setUploadingLocal] = useState(false);
-  const { currentTurn, updateTimer, setRecording, speakerNames } = useDebateStore();
+  const speakerNames = useDebateStore((state) => state.speakerNames);
+  
+  // Animation refs
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  
+  // Local state
+  const [uploading, setUploadingLocal] = useState(false);
   const pathname = usePathname();
 
-  const speakerNum = currentTurn?.speaker === 'A' ? 1 : 2;
+  // Early return if no turn
   if (!currentTurn) {
     router.replace('/');
     return null;
   }
 
-  const colors =
-    currentTurn?.speaker === 'A'
-      ? DebateColors.speaker1
-      : DebateColors.speaker2;
-
-  const isRecording = currentTurn?.status === 'recording';
-  const isIdle = currentTurn?.status === 'idle';
-  // Get the speaker name from store, with fallback
+  // Derived values
+  const speakerNum = currentTurn.speaker === 'A' ? 1 : 2;
+  const colors = currentTurn.speaker === 'A' ? DebateColors.speaker1 : DebateColors.speaker2;
   const speakerName = currentTurn.speaker === 'A' 
     ? (speakerNames?.A || 'Speaker A')
     : (speakerNames?.B || 'Speaker B');
-
   const isRecording = currentTurn.status === 'recording';
   const isIdle = currentTurn.status === 'idle';
   const isBusy = uploading || isRecording;
@@ -160,17 +156,37 @@ export default function TurnScreen() {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
-          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
           shouldDuckAndroid: true,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
           playThroughEarpieceAndroid: false,
           staysActiveInBackground: false,
         });
       }
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(
-        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
-      );
+      await recording.prepareToRecordAsync({
+        android: {
+          extension: '.m4a',
+          outputFormat: 2,
+          audioEncoder: 3,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.m4a',
+          outputFormat: 'mpeg4aac',
+          audioQuality: 127,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      });
       await recording.startAsync();
       recordingRef.current = recording;
       console.log('✅ Recording started, updating store...');

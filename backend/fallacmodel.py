@@ -104,7 +104,7 @@ def generate_json_from_text(text: str, system_preamble: Optional[str] = None) ->
 					fallacies.append({
 						"type": fallacy_type,
 						"quote": quote,
-						"explanation": f"Detected {fallacy_type} with {int(item.get('confidence', 0) * 100)}% confidence",
+						"explanation": f"This statement contains {fallacy_type.lower()}, which undermines logical reasoning.",
 						"confidence": item.get("confidence", 0)
 					})
 		

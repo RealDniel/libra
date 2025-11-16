@@ -201,6 +201,11 @@ export default function AnalysisScreen() {
               <View style={styles.cardLeftAccent} />
               <View style={styles.cleanCardContent}>
                 <Text style={styles.cleanCardTitle}>{fallacy.type}</Text>
+                {fallacy.quote && (
+                  <View style={styles.quoteContainer}>
+                    <Text style={styles.quoteText}>"{fallacy.quote}"</Text>
+                  </View>
+                )}
                 <Text style={styles.cleanCardText}>{fallacy.explanation}</Text>
               </View>
             </Animated.View>
@@ -456,6 +461,20 @@ const styles = StyleSheet.create({
   cleanCardText: {
     fontSize: 14,
     color: DebateColors.text.secondary,
+    lineHeight: 20,
+  },
+  quoteContainer: {
+    backgroundColor: DebateColors.background.card,
+    borderLeftWidth: 3,
+    borderLeftColor: DebateColors.status.warning,
+    padding: 12,
+    marginVertical: 8,
+    borderRadius: 4,
+  },
+  quoteText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: DebateColors.text.primary,
     lineHeight: 20,
   },
   // Fact Check Specific

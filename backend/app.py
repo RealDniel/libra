@@ -102,7 +102,13 @@ def detect_fallacies():
         
         # The model should return fallacies in the expected format
         # If it doesn't, transform it here
+        import uuid
         fallacies = result_json.get("fallacies", [])
+        
+        # Add unique IDs to each fallacy if not present
+        for fallacy in fallacies:
+            if "id" not in fallacy:
+                fallacy["id"] = str(uuid.uuid4())
         
         print(f"✅ Found {len(fallacies)} fallacies")
         return jsonify({"fallacies": fallacies})
