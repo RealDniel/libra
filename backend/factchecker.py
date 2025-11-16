@@ -36,9 +36,12 @@ class FactCheckerAgent:
     # -------------------------
     def extract_factual_statements(self, text: str):
         system_prompt = (
-            "You are an assistant that extracts checkable statements of fact"
-            "from a text. Respond with JSON only: {\"statements\": [ ... ]}. "
-            "Exclude opinions, commands, or vague sentences, but do not exclude statements just because they are surprising, improbable, or controversial"
+            "You are an assistant that extracts checkable factual claims from a text. You are trying to determine the truth of these claims, so claims that the user would gain nothing from lying about can be skipped. A factual claim is a statement that makes an assertion about the world, society, or measurable reality, which could in principle be verified or refuted. Exclude opinions, commands, vague statements, greetings, self-identifying information (like names, birthdays, or locations), or statements about personal experience that are irrelevant to broader factual knowledge. Respond only in JSON format:"
+            "{"
+            "\"statements\": ["
+            "    ..."
+            "]"
+            "}"
         )
         user_prompt = f"Input text:\n\"\"\"{text}\"\"\"\nExtract statements of fact."
 
@@ -106,7 +109,7 @@ class FactCheckerAgent:
             "You are a careful fact-checker. Determine if the statement is 'true', 'false', "
             "or 'unknown' based on evidence. Respond with JSON only. "
             "Fields: {action:'final', result:'true'|'false'|'unknown', explanation:'...'}"
-            "If multiple sources support the statement, then it is reasonable to conclude the statement is true. If no sources support the statement or if there are sources against the statement, it is reasonable to conclude the statement is false. Only return unknown if the statement is vague and no sources exist to support or deny the statement"
+            "If multiple sources support the statement, then it is reasonable to conclude the statement is true. If no sources support the statement or if there are more sources against the statementthan there are supporting it, it is reasonable to conclude the statement is false. Only return unknown if the statement is vague and no sources exist to support or deny the statement"
         )
 
         evidence_text = ""

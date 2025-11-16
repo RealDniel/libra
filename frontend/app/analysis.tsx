@@ -227,8 +227,8 @@ export default function AnalysisScreen() {
           </View>
           {factChecks.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyCardTitle}>✓ No Claims Detected</Text>
-              <Text style={styles.emptyCardText}>No verifiable claims were made in this turn.</Text>
+              <Text style={styles.emptyCardTitle}>✓ No False Claims Detected</Text>
+              <Text style={styles.emptyCardText}>No claims were verified to be false in this turn.</Text>
             </View>
           ) : (
             factChecks.map((fact, index) => (

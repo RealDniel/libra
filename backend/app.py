@@ -105,7 +105,12 @@ def factcheck():
         verdict_map = {"true": "verified", "false": "false", "unknown": "unverifiable"}
 
         for res in results:
-            verdict = verdict_map.get(res.get("verdict", "unknown").lower(), "unverifiable")
+            # Only include statements that were judged explicitly false
+            verdict_raw = res.get("verdict", "unknown").lower()
+            if verdict_raw != "false":
+                continue
+
+            verdict = verdict_map.get(verdict_raw, "false")
             sources = []
             for ev in res.get("evidence", []):
                 if isinstance(ev, dict):
@@ -115,6 +120,7 @@ def factcheck():
                             "url": item.get("link", ""),
                             "snippet": item.get("snippet", "")
                         })
+
             factchecks_out.append({
                 "id": str(uuid.uuid4()),
                 "claim": res.get("statement", text),
