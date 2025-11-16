@@ -1,14 +1,23 @@
 # When you pull this repo, run this
 ```bash
+cd backend
+
+
 # MAC
 python3 -m venv venv
 source venv/bin/activate
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
+
+cd frontend
+npm install
 
 #WINDOWS
 python -m venv venv
 venv\Scripts\activate.bat
-pip install -r backend\requirements.txt
+pip install -r requirements.txt
+
+cd frontend
+npm install
 ```
 
 # Get VSCODE to recognize the venv
