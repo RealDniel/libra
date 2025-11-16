@@ -1,8 +1,8 @@
 /**
- * Libra - Debate Summary Screen
+ * Libra - Debate Summary Screen (Modern Redesign)
  */
 
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,24 +11,38 @@ import {
   ScrollView,
   SafeAreaView,
   Animated,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, usePathname } from 'expo-router';
+import Markdown from 'react-native-markdown-display';
 import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
 
+const { width } = Dimensions.get('window');
+const isDesktop = width >= 768;
+
 export default function SummaryScreen() {
-  const { session, reset, speakerNames } = useDebateStore();
+  const { session, reset, speakerNames, speakerAggregates } = useDebateStore();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const card1Anim = useRef(new Animated.Value(0)).current;
+  const card2Anim = useRef(new Animated.Value(0)).current;
   const pathname = usePathname();
+  
+  const [summaries, setSummaries] = useState<{ A: string | null; B: string | null }>({ A: null, B: null });
+  const [loadingSummaries, setLoadingSummaries] = useState(false);
 
   useEffect(() => {
+    // Staggered entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
@@ -39,9 +53,31 @@ export default function SummaryScreen() {
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 500,
+        duration: 600,
         useNativeDriver: true,
       }),
+    ]).start();
+
+    // Staggered card animations
+    Animated.sequence([
+      Animated.delay(300),
+      Animated.parallel([
+        Animated.spring(card1Anim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(200),
+          Animated.spring(card2Anim, {
+            toValue: 1,
+            friction: 8,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
     ]).start();
   }, []);
 
@@ -53,6 +89,50 @@ export default function SummaryScreen() {
     }
   }, [pathname, session]);
 
+  // Generate AI summaries when component mounts
+  useEffect(() => {
+    if (session && speakerAggregates) {
+      generateSummaries();
+    }
+  }, []);
+
+  const generateSummaries = async () => {
+    if (!speakerAggregates) return;
+    
+    setLoadingSummaries(true);
+    try {
+      const [summaryA, summaryB] = await Promise.all([
+        fetchSummary(speakerAggregates.A, speaker1Name),
+        fetchSummary(speakerAggregates.B, speaker2Name),
+      ]);
+      setSummaries({ A: summaryA, B: summaryB });
+    } catch (error) {
+      console.error('Failed to generate summaries:', error);
+    } finally {
+      setLoadingSummaries(false);
+    }
+  };
+
+  const fetchSummary = async (transcript: string, speaker: string): Promise<string> => {
+    if (!transcript || !transcript.trim()) {
+      return 'No transcript available.';
+    }
+    try {
+      const res = await fetch('http://localhost:5001/api/generate-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript, speaker }),
+      });
+      if (!res.ok) {
+        return 'Failed to generate summary.';
+      }
+      const data = await res.json();
+      return data.summary || 'No summary available.';
+    } catch {
+      return 'Error generating summary.';
+    }
+  };
+
   if (!session) {
     return null;
   }
@@ -61,38 +141,17 @@ export default function SummaryScreen() {
   const speaker1Turns = allTurns.filter((t) => t.speaker === 'A');
   const speaker2Turns = allTurns.filter((t) => t.speaker === 'B');
 
-  // Aggregate all fallacies per speaker
-  const speaker1Fallacies = useMemo(() => {
-    const fallacies: any[] = [];
-    for (const turn of speaker1Turns) {
-      fallacies.push(...turn.fallacies);
-    }
-    return fallacies;
-  }, [speaker1Turns]);
+  // Aggregate fallacies
+  const speaker1Fallacies = speaker1Turns.flatMap((t) => t.fallacies);
+  const speaker2Fallacies = speaker2Turns.flatMap((t) => t.fallacies);
 
-  const speaker2Fallacies = useMemo(() => {
-    const fallacies: any[] = [];
-    for (const turn of speaker2Turns) {
-      fallacies.push(...turn.fallacies);
-    }
-    return fallacies;
-  }, [speaker2Turns]);
-
-  // Aggregate all fact-checks
-  const allFactChecks = useMemo(() => {
-    const factChecks: any[] = [];
-    for (const turn of allTurns) {
-      for (const fc of turn.factChecks) {
-        factChecks.push({ ...fc, speaker: turn.speaker });
-      }
-    }
-    return factChecks;
-  }, [allTurns]);
-
-  // Count verdicts
-  const falseCount = allFactChecks.filter((fc) => fc.verdict === 'false').length;
-  const verifiedCount = allFactChecks.filter((fc) => fc.verdict === 'verified' || fc.verdict === 'true').length;
-  const unverifiableCount = allFactChecks.filter((fc) => fc.verdict === 'unverifiable').length;
+  // Get ONLY false claims
+  const speaker1FalseClaims = speaker1Turns
+    .flatMap((t) => t.factChecks)
+    .filter((fc) => fc.verdict === 'false');
+  const speaker2FalseClaims = speaker2Turns
+    .flatMap((t) => t.factChecks)
+    .filter((fc) => fc.verdict === 'false');
 
   const handleStartNewDebate = () => {
     reset();
@@ -103,394 +162,652 @@ export default function SummaryScreen() {
   const speaker2Name = speakerNames?.B || 'Speaker B';
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Gradient Background */}
+    <View style={styles.container}>
+      {/* Animated gradient background */}
       <LinearGradient
-        colors={[DebateColors.accent.purple, DebateColors.background.primary] as any}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.3 }}
+        colors={['#1a0b2e', '#2d1b4e', '#1a0b2e']}
         style={StyleSheet.absoluteFill}
       />
+      
+      {/* Floating orbs */}
+      <View style={styles.orbContainer}>
+        <View style={[styles.orb, styles.orb1]} />
+        <View style={[styles.orb, styles.orb2]} />
+        <View style={[styles.orb, styles.orb3]} />
+      </View>
 
-      {/* Hero Header */}
-      <Animated.View
-        style={[styles.heroHeader, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}
-      >
-        <View style={styles.trophyIcon}>
-          <Text style={styles.trophyEmoji}>🏆</Text>
-        </View>
-        <Text style={styles.heroTitle}>Debate{'\n'}Complete</Text>
-        <Text style={styles.heroSubtitle}>{allTurns.length} turns analyzed</Text>
-      </Animated.View>
-
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Speaker 1 Summary */}
-        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <View style={[styles.sectionHeader, { backgroundColor: DebateColors.speaker1.primary }]}>
-            <View style={styles.speakerIconContainer}>
-              <View style={[styles.speakerIcon, { backgroundColor: DebateColors.speaker1.secondary }]}>
-                <Text style={styles.speakerIconText}>1</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionTitle}>{speaker1Name}</Text>
-          </View>
-
-          {/* Fallacies */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Logical Fallacies</Text>
-              <View style={[styles.badge, { backgroundColor: DebateColors.status.warning }]}>
-                <Text style={styles.badgeText}>{speaker1Fallacies.length}</Text>
-              </View>
-            </View>
-            {speaker1Fallacies.length === 0 ? (
-              <Text style={styles.emptyText}>✓ No fallacies detected</Text>
-            ) : (
-              speaker1Fallacies.map((fallacy, index) => (
-                <View key={index} style={styles.fallacyItem}>
-                  <Text style={styles.fallacyType}>• {fallacy.type}</Text>
-                  {fallacy.quote && (
-                    <Text style={styles.fallacyQuote}>"{fallacy.quote}"</Text>
-                  )}
-                </View>
-              ))
-            )}
-          </View>
-
-          {/* Main Points - Placeholder for now */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Key Arguments</Text>
-            </View>
-            <Text style={styles.placeholderText}>AI-generated summary coming soon...</Text>
-          </View>
-        </Animated.View>
-
-        {/* Speaker 2 Summary */}
-        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <View style={[styles.sectionHeader, { backgroundColor: DebateColors.speaker2.primary }]}>
-            <View style={styles.speakerIconContainer}>
-              <View style={[styles.speakerIcon, { backgroundColor: DebateColors.speaker2.secondary }]}>
-                <Text style={styles.speakerIconText}>2</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionTitle}>{speaker2Name}</Text>
-          </View>
-
-          {/* Fallacies */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Logical Fallacies</Text>
-              <View style={[styles.badge, { backgroundColor: DebateColors.status.warning }]}>
-                <Text style={styles.badgeText}>{speaker2Fallacies.length}</Text>
-              </View>
-            </View>
-            {speaker2Fallacies.length === 0 ? (
-              <Text style={styles.emptyText}>✓ No fallacies detected</Text>
-            ) : (
-              speaker2Fallacies.map((fallacy, index) => (
-                <View key={index} style={styles.fallacyItem}>
-                  <Text style={styles.fallacyType}>• {fallacy.type}</Text>
-                  {fallacy.quote && (
-                    <Text style={styles.fallacyQuote}>"{fallacy.quote}"</Text>
-                  )}
-                </View>
-              ))
-            )}
-          </View>
-
-          {/* Main Points - Placeholder for now */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Key Arguments</Text>
-            </View>
-            <Text style={styles.placeholderText}>AI-generated summary coming soon...</Text>
-          </View>
-        </Animated.View>
-
-        {/* Fact-Check Summary */}
-        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <View style={[styles.sectionHeader, { backgroundColor: DebateColors.accent.purple }]}>
-            <Text style={styles.sectionTitle}>Fact-Check Summary</Text>
-          </View>
-
-          <View style={styles.card}>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <View style={[styles.statCircle, { backgroundColor: DebateColors.status.false }]}>
-                  <Text style={styles.statNumber}>{falseCount}</Text>
-                </View>
-                <Text style={styles.statLabel}>False</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statCircle, { backgroundColor: DebateColors.status.verified }]}>
-                  <Text style={styles.statNumber}>{verifiedCount}</Text>
-                </View>
-                <Text style={styles.statLabel}>Verified</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statCircle, { backgroundColor: DebateColors.status.uncertain }]}>
-                  <Text style={styles.statNumber}>{unverifiableCount}</Text>
-                </View>
-                <Text style={styles.statLabel}>Unverifiable</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Show false claims in detail */}
-          {falseCount > 0 && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>False Claims</Text>
-              </View>
-              {allFactChecks
-                .filter((fc) => fc.verdict === 'false')
-                .map((fc, index) => (
-                  <View key={index} style={styles.factCheckItem}>
-                    <View style={styles.factCheckHeader}>
-                      <Text style={styles.factCheckSpeaker}>
-                        {fc.speaker === 'A' ? speaker1Name : speaker2Name}
-                      </Text>
-                    </View>
-                    <Text style={styles.factCheckClaim}>"{fc.claim}"</Text>
-                    <Text style={styles.factCheckExplanation}>{fc.explanation}</Text>
-                  </View>
-                ))}
-            </View>
-          )}
-        </Animated.View>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* Action Button */}
-      <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.actionButton,
-            pressed && styles.buttonPressed,
+      <SafeAreaView style={styles.safeArea}>
+        {/* Hero Header */}
+        <Animated.View 
+          style={[
+            styles.heroHeader, 
+            { 
+              opacity: fadeAnim, 
+              transform: [{ scale: scaleAnim }] 
+            }
           ]}
-          onPress={handleStartNewDebate}
         >
-          <Text style={styles.actionButtonText}>New Debate</Text>
-        </Pressable>
-      </Animated.View>
-    </SafeAreaView>
+          <Image
+            source={require('../assets/images/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.heroTitle}>Debate Complete</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statBadge}>
+              <Text style={styles.statNumber}>{allTurns.length}</Text>
+              <Text style={styles.statLabel}>Turns</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Speaker Cards */}
+          <View
+            style={[
+              styles.cardsContainer,
+              isDesktop ? styles.cardsRow : styles.cardsColumn,
+            ]}
+          >
+            {/* Speaker 1 Card */}
+            <Animated.View 
+              style={[
+                styles.speakerCard, 
+                isDesktop && styles.speakerCardHalf,
+                {
+                  opacity: card1Anim,
+                  transform: [{
+                    translateY: card1Anim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [50, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={['#B81D1D', '#780C0C', '#B81D1D']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cardGradient}
+              />
+              
+              <View style={styles.cardContent}>
+                {/* Header */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.speakerBadge}>
+                    <Text style={styles.speakerNumber}>1</Text>
+                  </View>
+                  <Text style={styles.speakerName}>{speaker1Name}</Text>
+                </View>
+
+                {/* AI Summary Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Summary</Text>
+                  </View>
+                  <View style={styles.contentBox}>
+                    {loadingSummaries ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text style={styles.loadingText}>Generating summary...</Text>
+                      </View>
+                    ) : (
+                      <Markdown style={markdownStyles}>
+                        {summaries.A || 'No summary available'}
+                      </Markdown>
+                    )}
+                  </View>
+                </View>
+
+                {/* Fallacies Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Logical Fallacies</Text>
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countText}>{speaker1Fallacies.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.contentBox}>
+                    {speaker1Fallacies.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No fallacies detected</Text>
+                      </View>
+                    ) : (
+                      speaker1Fallacies.map((fallacy, idx) => (
+                        <View key={idx} style={styles.fallacyItem}>
+                          <View style={styles.fallacyDot} />
+                          <View style={styles.fallacyContent}>
+                            <Text style={styles.fallacyType}>{fallacy.type}</Text>
+                            {fallacy.quote && (
+                              <Text style={styles.fallacyQuote}>"{fallacy.quote}"</Text>
+                            )}
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </View>
+
+                {/* False Claims Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>False Claims</Text>
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countText}>{speaker1FalseClaims.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.contentBox}>
+                    {speaker1FalseClaims.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No false claims detected</Text>
+                      </View>
+                    ) : (
+                      speaker1FalseClaims.map((fc, idx) => (
+                        <View key={idx} style={styles.claimItem}>
+                          <Text style={styles.claimText}>"{fc.claim}"</Text>
+                          <Text style={styles.claimExplanation}>{fc.explanation}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+
+            {/* Speaker 2 Card */}
+            <Animated.View 
+              style={[
+                styles.speakerCard, 
+                isDesktop && styles.speakerCardHalf,
+                {
+                  opacity: card2Anim,
+                  transform: [{
+                    translateY: card2Anim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [50, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={['#1D1DB8', '#0C1778', '#1D1DB8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cardGradient}
+              />
+              
+              <View style={styles.cardContent}>
+                {/* Header */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.speakerBadge}>
+                    <Text style={styles.speakerNumber}>2</Text>
+                  </View>
+                  <Text style={styles.speakerName}>{speaker2Name}</Text>
+                </View>
+
+                {/* AI Summary Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Summary</Text>
+                  </View>
+                  <View style={styles.contentBox}>
+                    {loadingSummaries ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text style={styles.loadingText}>Generating summary...</Text>
+                      </View>
+                    ) : (
+                      <Markdown style={markdownStyles}>
+                        {summaries.B || 'No summary available'}
+                      </Markdown>
+                    )}
+                  </View>
+                </View>
+
+                {/* Fallacies Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Logical Fallacies</Text>
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countText}>{speaker2Fallacies.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.contentBox}>
+                    {speaker2Fallacies.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No fallacies detected</Text>
+                      </View>
+                    ) : (
+                      speaker2Fallacies.map((fallacy, idx) => (
+                        <View key={idx} style={styles.fallacyItem}>
+                          <View style={styles.fallacyDot} />
+                          <View style={styles.fallacyContent}>
+                            <Text style={styles.fallacyType}>{fallacy.type}</Text>
+                            {fallacy.quote && (
+                              <Text style={styles.fallacyQuote}>"{fallacy.quote}"</Text>
+                            )}
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </View>
+
+                {/* False Claims Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>False Claims</Text>
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countText}>{speaker2FalseClaims.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.contentBox}>
+                    {speaker2FalseClaims.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No false claims detected</Text>
+                      </View>
+                    ) : (
+                      speaker2FalseClaims.map((fc, idx) => (
+                        <View key={idx} style={styles.claimItem}>
+                          <Text style={styles.claimText}>"{fc.claim}"</Text>
+                          <Text style={styles.claimExplanation}>{fc.explanation}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          </View>
+
+          <View style={{ height: 120 }} />
+        </ScrollView>
+
+        {/* Floating Action Button */}
+        <Animated.View style={[styles.fabContainer, { opacity: fadeAnim }]}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.fab,
+              pressed && styles.fabPressed,
+            ]}
+            onPress={handleStartNewDebate}
+          >
+            <LinearGradient
+              colors={['#8b5cf6', '#7c3aed', '#6d28d9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.fabGradient}
+            >
+              <Text style={styles.fabText}>New Debate</Text>
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: DebateColors.background.primary,
+    backgroundColor: '#0a0118',
+  },
+  orbContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+    opacity: 0.15,
+  },
+  orb1: {
+    width: 400,
+    height: 400,
+    backgroundColor: '#3b82f6',
+    top: -100,
+    left: -150,
+  },
+  orb2: {
+    width: 350,
+    height: 350,
+    backgroundColor: '#ef4444',
+    bottom: -100,
+    right: -150,
+  },
+  orb3: {
+    width: 300,
+    height: 300,
+    backgroundColor: '#8b5cf6',
+    top: '40%',
+    left: '50%',
+    marginLeft: -150,
+    marginTop: -150,
+  },
+  safeArea: {
+    flex: 1,
   },
   heroHeader: {
-    paddingTop: 60,
-    paddingHorizontal: 32,
+    paddingTop: 40,
+    paddingHorizontal: 20,
     paddingBottom: 30,
     alignItems: 'center',
   },
-  trophyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    borderWidth: 3,
-    borderColor: DebateColors.accent.purple,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  trophyEmoji: {
-    fontSize: 36,
+  logo: {
+    width: 100,
+    height: 54,
+    marginBottom: 16,
   },
   heroTitle: {
-    fontSize: 48,
-    fontWeight: '400',
-    color: DebateColors.text.primary,
-    textAlign: 'center',
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#ffffff',
     letterSpacing: -1,
-    lineHeight: 52,
-    marginBottom: 8,
+    marginBottom: 24,
+    textShadowColor: 'rgba(139, 92, 246, 0.5)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
   },
-  heroSubtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: DebateColors.text.tertiary,
-    letterSpacing: 0.3,
+  statsRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 20,
   },
+  cardsContainer: {
+    width: '100%',
+  },
+  cardsRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  cardsColumn: {
+    flexDirection: 'column',
+    gap: 16,
+  },
+  speakerCard: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+      },
+    }),
+  },
+  speakerCardHalf: {
+    flex: 1,
+  },
+  cardGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  cardContent: {
+    padding: 20,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  speakerBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  speakerNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  speakerName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    flex: 1,
+  },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
     marginBottom: 12,
-    gap: 12,
-  },
-  speakerIconContainer: {
-    width: 32,
-    height: 32,
-  },
-  speakerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  speakerIconText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: DebateColors.text.primary,
+    gap: 8,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: DebateColors.text.primary,
-    flex: 1,
-  },
-  card: {
-    backgroundColor: DebateColors.background.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: DebateColors.background.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: DebateColors.text.primary,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
     fontSize: 14,
     fontWeight: '700',
-    color: DebateColors.text.primary,
+    color: '#ffffff',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    flex: 1,
+  },
+  countBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  contentBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontStyle: 'italic',
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#ffffff',
+    lineHeight: 22,
+  },
+  emptyState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: DebateColors.status.verified,
+    color: 'rgba(255, 255, 255, 0.7)',
     fontStyle: 'italic',
   },
   fallacyItem: {
+    flexDirection: 'row',
     marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: DebateColors.background.border,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  fallacyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ffffff',
+    marginTop: 7,
+  },
+  fallacyContent: {
+    flex: 1,
   },
   fallacyType: {
     fontSize: 14,
     fontWeight: '600',
-    color: DebateColors.text.primary,
+    color: '#ffffff',
     marginBottom: 4,
   },
   fallacyQuote: {
     fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
     fontStyle: 'italic',
-    color: DebateColors.text.secondary,
-    marginLeft: 12,
+    lineHeight: 18,
   },
-  placeholderText: {
-    fontSize: 14,
-    color: DebateColors.text.tertiary,
-    fontStyle: 'italic',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  statCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: DebateColors.text.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: DebateColors.text.secondary,
-  },
-  factCheckItem: {
+  claimItem: {
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: DebateColors.background.border,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  factCheckHeader: {
-    marginBottom: 8,
-  },
-  factCheckSpeaker: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: DebateColors.text.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  factCheckClaim: {
+  claimText: {
     fontSize: 14,
     fontWeight: '600',
-    color: DebateColors.text.primary,
+    color: '#ffffff',
     marginBottom: 6,
+    lineHeight: 20,
   },
-  factCheckExplanation: {
+  claimExplanation: {
     fontSize: 13,
-    color: DebateColors.text.secondary,
+    color: 'rgba(255, 255, 255, 0.7)',
     lineHeight: 18,
   },
-  actions: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingBottom: 40,
-  },
-  actionButton: {
-    backgroundColor: DebateColors.accent.purple,
-    paddingVertical: 16,
-    borderRadius: 12,
+  fabContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: DebateColors.accent.purple,
   },
-  buttonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+  fab: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#8b5cf6',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 8px 32px rgba(139, 92, 246, 0.4)',
+      },
+    }),
   },
-  actionButtonText: {
+  fabPressed: {
+    transform: [{ scale: 0.96 }],
+  },
+  fabGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  fabIcon: {
+    fontSize: 20,
+  },
+  fabText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: DebateColors.text.primary,
+    fontWeight: '700',
+    color: '#ffffff',
     letterSpacing: 0.5,
+  },
+});
+
+// Markdown styles for AI summary
+const markdownStyles = StyleSheet.create({
+  body: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  heading1: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  heading2: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  strong: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  em: {
+    fontStyle: 'italic',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  bullet_list: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  ordered_list: {
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  list_item: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  paragraph: {
+    marginBottom: 8,
   },
 });

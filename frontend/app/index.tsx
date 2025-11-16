@@ -145,6 +145,69 @@ export default function HomeScreen() {
     router.push('/turn');
   };
 
+  // TEST MODE: Create mock debate and go to summary
+  const handleTestSummary = () => {
+    store.reset();
+    if (store.setSpeakerNames) {
+      store.setSpeakerNames({ A: speakerAName, B: speakerBName });
+    }
+    store.startDebate();
+    
+    // Create mock turn 1 (Speaker A)
+    store.startTurn('A', 120, speakerAName, speakerBName);
+    store.setTranscript("Climate change is a hoax invented by China. Everyone knows this.");
+    store.setAnalysis(
+      [
+        {
+          id: '1',
+          type: 'Ad Hominem',
+          quote: 'Climate change is a hoax invented by China',
+          explanation: 'This statement contains ad hominem, which undermines logical reasoning.',
+          confidence: 0.95,
+        }
+      ],
+      [
+        {
+          id: '1',
+          claim: 'Climate change is a hoax invented by China',
+          verdict: 'false',
+          explanation: 'This claim is false. Climate change is supported by overwhelming scientific consensus.',
+          confidence: 95,
+        }
+      ]
+    );
+    store.completeTurn();
+    
+    // Create mock turn 2 (Speaker B)
+    store.nextSpeaker();
+    store.setTranscript("The Earth is flat and NASA is lying to us all.");
+    store.setAnalysis(
+      [
+        {
+          id: '2',
+          type: 'Appeal To Emotion',
+          quote: 'NASA is lying to us all',
+          explanation: 'This statement contains appeal to emotion, which undermines logical reasoning.',
+          confidence: 0.88,
+        }
+      ],
+      [
+        {
+          id: '2',
+          claim: 'The Earth is flat',
+          verdict: 'false',
+          explanation: 'The Earth is an oblate spheroid, confirmed by centuries of scientific observation.',
+          confidence: 99,
+        }
+      ]
+    );
+    store.completeTurn();
+    
+    // End debate and go to summary
+    store.endDebate();
+    router.push('/summary');
+  };
+
   const incrementTime = () => {
     setSpeakingTime(prev => Math.min(prev + 1, 99)); // Max 99 minutes
   };
@@ -331,11 +394,15 @@ export default function HomeScreen() {
 
           {/* Beta tag and version */}
           <View style={styles.betaContainer}>
-            <View style={styles.betaTag}>
+            <Pressable
+              style={styles.betaTag}
+              onLongPress={handleTestSummary}
+              delayLongPress={2000}
+            >
               <View style={styles.betaDot} />
               <Text style={styles.betaText}>BETA</Text>
-            </View>
-            <Text style={styles.versionText}>Version 1.0</Text>
+            </Pressable>
+            <Text style={styles.versionText}>Version 1.0 · Hold BETA to test</Text>
           </View>
         </Animated.View>
       </View>

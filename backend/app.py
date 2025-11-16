@@ -194,6 +194,59 @@ def factcheck():
             'result': 'error'
         }), 500
 
+@app.route("/api/generate-summary", methods=["POST"])
+def generate_summary():
+    """Generate AI summary of key arguments from transcript"""
+    try:
+        data = request.get_json(silent=True) or {}
+        transcript = data.get("transcript", "")
+        speaker = data.get("speaker", "Unknown")
+        
+        if not transcript or not transcript.strip():
+            return jsonify({"error": "Missing transcript"}), 400
+        
+        print(f"\n📝 Generating summary for {speaker}...")
+        
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or os.getenv("OPEN_AI_KEY"))
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a debate analyst. Given a speaker's full transcript, "
+                        "extract their key arguments, main points, and thesis. "
+                        "Be concise and straight to the point. Use markdown formatting. "
+                        "Format as:\n"
+                        "**Thesis:** [main argument]\n\n"
+                        "**Key Points:**\n"
+                        "- Point 1\n"
+                        "- Point 2\n"
+                        "- Point 3"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Analyze this debate transcript:\n\n{transcript}"
+                }
+            ],
+            temperature=0.3,
+            max_tokens=300
+        )
+        
+        summary = response.choices[0].message.content
+        print(f"✅ Summary generated: {len(summary)} chars")
+        
+        return jsonify({"summary": summary})
+        
+    except Exception as e:
+        print(f"❌ Summary generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to generate summary: {str(e)}"}), 500
+
 @app.route("/api/test", methods=["GET"])
 def test():
     """Simple test endpoint to verify server is running"""

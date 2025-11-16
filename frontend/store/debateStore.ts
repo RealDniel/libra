@@ -230,8 +230,8 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
         turnNumber: state.session.turns.length + 1,
         duration: state.turnDurationSeconds - state.currentTurn.timeRemaining,
         transcript: state.currentTurn.transcript,
-        fallacies: [], // Will be filled from analysis
-        factChecks: [], // Will be filled from analysis
+        fallacies: state.currentTurn.fallacies || [],
+        factChecks: state.currentTurn.factChecks || [],
         audioUri: state.currentTurn.audioUri,
         createdAt: new Date(),
       };
