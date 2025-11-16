@@ -1,6 +1,5 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Libra - Debate Training App Theme
  */
 
 import { Platform } from 'react-native';
@@ -24,6 +23,48 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+  },
+};
+
+// Debate-specific colors - Professional & Modern
+export const DebateColors = {
+  speaker1: {
+    primary: '#4F7EF7',
+    secondary: '#6B9BFF',
+    gradient: ['#1E3A8A', '#3B5FCC', '#4F7EF7', '#6B9BFF'],
+    text: '#FFFFFF',
+    glow: 'rgba(79, 126, 247, 0.3)',
+  },
+  speaker2: {
+    primary: '#EF476F',
+    secondary: '#FF6B8A',
+    gradient: ['#B91C3A', '#D63152', '#EF476F', '#FF6B8A'],
+    text: '#FFFFFF',
+    glow: 'rgba(239, 71, 111, 0.3)',
+  },
+  background: {
+    primary: '#0A0E1A',
+    secondary: '#141927',
+    tertiary: '#1E2536',
+    card: '#1A2032',
+    border: 'rgba(255, 255, 255, 0.08)',
+  },
+  text: {
+    primary: '#FFFFFF',
+    secondary: 'rgba(255, 255, 255, 0.7)',
+    tertiary: 'rgba(255, 255, 255, 0.5)',
+    muted: 'rgba(255, 255, 255, 0.3)',
+  },
+  status: {
+    verified: '#06D6A0',
+    true: '#06D6A0',      // Green (same as verified)
+    false: '#FF5A5F',
+    uncertain: '#FFB400',
+    warning: '#FF8C42',
+  },
+  accent: {
+    purple: '#8B5CF6',
+    cyan: '#06B6D4',
   },
 };
 
