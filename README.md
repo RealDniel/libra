@@ -51,15 +51,3 @@ npm start
 
 ## Open the app
 Scan the QR code with your phone after downloading Expo Go from app store
-
-### It said this when I ran npx create-expo-app frontend
-```bash
-✅ Your project is ready!
-
-To run your project, navigate to the directory and run one of the following npm commands.
-
-- cd frontend
-- npm run android
-- npm run ios
-- npm run web
-```

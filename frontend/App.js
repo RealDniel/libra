@@ -5,7 +5,7 @@ export default function App() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch("http://172.20.10.2:5001/api/hello") // PASTE YOUR IP ADDRESS IN THE QUOTES HERE
+    fetch("http://172.20.10.2:5001/api/hello") // PASTE YOUR IP ADDRESS IN THE QUOTES HERE ( KEEP /api/hello)
       .then((res) => res.json())
       .then((data) => setMessage(data.message))
       .catch(console.error);
