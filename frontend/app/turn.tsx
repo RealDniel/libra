@@ -12,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
 
@@ -20,18 +20,22 @@ export default function TurnScreen() {
   const { currentTurn, updateTimer, setRecording, speakerNames } = useDebateStore();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pathname = usePathname();
 
+  const speakerNum = currentTurn?.speaker === 'A' ? 1 : 2;
   if (!currentTurn) {
     router.replace('/');
     return null;
   }
 
   const colors =
-    currentTurn.speaker === 'A'
+    currentTurn?.speaker === 'A'
       ? DebateColors.speaker1
       : DebateColors.speaker2;
 
+  const isRecording = currentTurn?.status === 'recording';
+  const isIdle = currentTurn?.status === 'idle';
   // Get the speaker name from store, with fallback
   const speakerName = currentTurn.speaker === 'A' 
     ? (speakerNames?.A || 'Speaker A')
@@ -41,8 +45,9 @@ export default function TurnScreen() {
   const isIdle = currentTurn.status === 'idle';
 
   // Format time as mm:ss
-  const minutes = Math.floor(currentTurn.timeRemaining / 60);
-  const seconds = currentTurn.timeRemaining % 60;
+  const timeRemaining = currentTurn?.timeRemaining ?? 0;
+  const minutes = Math.floor(timeRemaining / 60);
+  const seconds = timeRemaining % 60;
   const timeDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
   // Pulse animation for recording
@@ -76,12 +81,19 @@ export default function TurnScreen() {
     }).start();
   }, []);
 
+  // Redirect when no current turn (must occur in an effect, not during render)
+  useEffect(() => {
+    if (pathname === '/turn' && !currentTurn) {
+      router.replace('/');
+    }
+  }, [pathname, currentTurn]);
+
   // Timer countdown
   useEffect(() => {
-    if (isRecording && currentTurn.timeRemaining > 0) {
+    if (isRecording && timeRemaining > 0) {
       timerInterval.current = setInterval(() => {
-        updateTimer(currentTurn.timeRemaining - 1);
-        if (currentTurn.timeRemaining <= 1) {
+        updateTimer(timeRemaining - 1);
+        if (timeRemaining <= 1) {
           handleStop();
         }
       }, 1000);
@@ -92,7 +104,7 @@ export default function TurnScreen() {
         clearInterval(timerInterval.current);
       }
     };
-  }, [isRecording, currentTurn.timeRemaining]);
+  }, [isRecording, timeRemaining]);
 
   const handleMicPress = () => {
     if (isIdle) {
@@ -116,7 +128,7 @@ export default function TurnScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={[...colors.gradient].reverse()}
+        colors={[...colors.gradient].reverse() as any}
         style={styles.gradient}
       >
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
@@ -126,7 +138,7 @@ export default function TurnScreen() {
             <Animated.Text
               style={[
                 styles.timer,
-                isRecording && currentTurn.timeRemaining <= 10 && styles.timerWarning,
+                isRecording && timeRemaining <= 10 && styles.timerWarning,
               ]}
             >
               {timeDisplay}

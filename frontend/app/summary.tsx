@@ -2,7 +2,7 @@
  * Libra - Debate Summary Screen
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,17 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
 
 export default function SummaryScreen() {
   const { session, reset } = useDebateStore();
+  const [selected, setSelected] = useState<{ speaker: 'A' | 'B'; category: string; sentences: string[] } | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const pathname = usePathname();
 
   useEffect(() => {
     Animated.parallel([
@@ -44,8 +46,47 @@ export default function SummaryScreen() {
     ]).start();
   }, []);
 
+  // Always compute turns and aggregates so hooks run every render
+  const allTurns = session?.turns ?? [];
+  const speaker1Turns = allTurns.filter((t) => t.speaker === 'A');
+  const speaker2Turns = allTurns.filter((t) => t.speaker === 'B');
+
+  // Aggregate fallacies per speaker by category -> sentences
+  const speaker1Fallacies = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const turn of speaker1Turns) {
+      for (const f of turn.fallacies) {
+        const key = (f as any).category || (f as any).type || 'Unknown';
+        const sentences = Array.isArray((f as any).sentences) ? (f as any).sentences : ((f as any).sentence ? [(f as any).sentence] : []);
+        if (!map[key]) map[key] = [];
+        map[key].push(...sentences);
+      }
+    }
+    return Object.entries(map).map(([category, sentences]) => ({ category, sentences }));
+  }, [speaker1Turns]);
+
+  const speaker2Fallacies = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const turn of speaker2Turns) {
+      for (const f of turn.fallacies) {
+        const key = (f as any).category || (f as any).type || 'Unknown';
+        const sentences = Array.isArray((f as any).sentences) ? (f as any).sentences : ((f as any).sentence ? [(f as any).sentence] : []);
+        if (!map[key]) map[key] = [];
+        map[key].push(...sentences);
+      }
+    }
+    return Object.entries(map).map(([category, sentences]) => ({ category, sentences }));
+  }, [speaker2Turns]);
+
+  // Avoid navigating during render on web – defer redirect until after mount
+  useEffect(() => {
+    if (pathname === '/summary' && !session) {
+      const id = setTimeout(() => router.replace('/'), 0);
+      return () => clearTimeout(id);
+    }
+  }, [pathname, session]);
+
   if (!session) {
-    router.replace('/');
     return null;
   }
 
@@ -55,25 +96,23 @@ export default function SummaryScreen() {
   };
 
   // Calculate stats
-  const totalTurns = session.turns.length;
-  const totalFallacies = session.turns.reduce(
+  const totalTurns = allTurns.length;
+  const totalFallacies = allTurns.reduce(
     (acc, turn) => acc + turn.fallacies.length,
     0
   );
-  const totalFactChecks = session.turns.reduce(
+  const totalFactChecks = allTurns.reduce(
     (acc, turn) => acc + turn.factChecks.length,
     0
   );
 
-  // Group turns by speaker
-  const speaker1Turns = session.turns.filter((t) => t.speaker === 'A');
-  const speaker2Turns = session.turns.filter((t) => t.speaker === 'B');
+  // (no aggregation; original timeline view)
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Gradient Background */}
       <LinearGradient
-        colors={[DebateColors.accent.purple, DebateColors.background.primary]}
+        colors={[DebateColors.accent.purple, DebateColors.background.primary] as any}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 0.3 }}
         style={StyleSheet.absoluteFill}
@@ -91,96 +130,64 @@ export default function SummaryScreen() {
       </Animated.View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Big Hero Stats */}
-        <Animated.View
-          style={[styles.heroStats, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-        >
-          <View style={styles.mainStat}>
-            <Text style={styles.mainStatNumber}>{totalFallacies}</Text>
-            <Text style={styles.mainStatLabel}>Logical Fallacies</Text>
-            <View style={[styles.statUnderline, { backgroundColor: DebateColors.status.warning }]} />
+        {/* Big Hero Stats removed by request */}
+
+        {/* Apple Watch-like Bubble Clusters */}
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <View style={{ marginBottom: 36 }}>
+            <BubbleCluster
+              title="Speaker 1"
+              speaker="A"
+              centerColor={DebateColors.speaker1.primary}
+              glowColor={(DebateColors as any).speaker1?.glow || DebateColors.speaker1.primary}
+              textColor={DebateColors.text.primary}
+              categories={speaker1Fallacies}
+              onSelect={(item) => setSelected({ speaker: 'A', ...item })}
+            />
           </View>
-          <View style={styles.mainStat}>
-            <Text style={styles.mainStatNumber}>{totalFactChecks}</Text>
-            <Text style={styles.mainStatLabel}>Fact Checks</Text>
-            <View style={[styles.statUnderline, { backgroundColor: DebateColors.speaker1.primary }]} />
+          <View style={{ marginBottom: 12 }}>
+            <BubbleCluster
+              title="Speaker 2"
+              speaker="B"
+              centerColor={DebateColors.speaker2.primary}
+              glowColor={(DebateColors as any).speaker2?.glow || DebateColors.speaker2.primary}
+              textColor={DebateColors.text.primary}
+              categories={speaker2Fallacies}
+              onSelect={(item) => setSelected({ speaker: 'B', ...item })}
+            />
           </View>
         </Animated.View>
 
-        {/* Speaker Sections - Timeline Style */}
-        <Animated.View style={[styles.timelineContainer, { opacity: fadeAnim }]}>
-          {/* Speaker 1 */}
-          <LinearGradient
-            colors={[...DebateColors.speaker1.gradient].reverse()}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.speakerCard}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.speakerBadge}>
-                <Text style={styles.badgeText}>1</Text>
-              </View>
-              <View style={styles.cardHeaderText}>
-                <Text style={styles.speakerName}>Speaker 1</Text>
-                <Text style={styles.speakerMeta}>{speaker1Turns.length} turns</Text>
-              </View>
-            </View>
-            {speaker1Turns.length > 0 && (
-              <View style={styles.cardStats}>
-                <View style={styles.miniStat}>
-                  <Text style={styles.miniStatValue}>
-                    {speaker1Turns.reduce((acc, t) => acc + t.fallacies.length, 0)}
-                  </Text>
-                  <Text style={styles.miniStatLabel}>Fallacies</Text>
-                </View>
-                <View style={styles.miniStat}>
-                  <Text style={styles.miniStatValue}>
-                    {speaker1Turns.reduce((acc, t) => acc + t.factChecks.length, 0)}
-                  </Text>
-                  <Text style={styles.miniStatLabel}>Fact Checks</Text>
-                </View>
-              </View>
-            )}
-          </LinearGradient>
-
-          {/* Speaker 2 */}
-          <LinearGradient
-            colors={[...DebateColors.speaker2.gradient].reverse()}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.speakerCard}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.speakerBadge}>
-                <Text style={styles.badgeText}>2</Text>
-              </View>
-              <View style={styles.cardHeaderText}>
-                <Text style={styles.speakerName}>Speaker 2</Text>
-                <Text style={styles.speakerMeta}>{speaker2Turns.length} turns</Text>
-              </View>
-            </View>
-            {speaker2Turns.length > 0 && (
-              <View style={styles.cardStats}>
-                <View style={styles.miniStat}>
-                  <Text style={styles.miniStatValue}>
-                    {speaker2Turns.reduce((acc, t) => acc + t.fallacies.length, 0)}
-                  </Text>
-                  <Text style={styles.miniStatLabel}>Fallacies</Text>
-                </View>
-                <View style={styles.miniStat}>
-                  <Text style={styles.miniStatValue}>
-                    {speaker2Turns.reduce((acc, t) => acc + t.factChecks.length, 0)}
-                  </Text>
-                  <Text style={styles.miniStatLabel}>Fact Checks</Text>
-                </View>
-              </View>
-            )}
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Detail overlay */}
+      {selected && (
+        <View style={styles.detailOverlay} pointerEvents="box-none">
+          <View style={styles.detailCard}>
+            <Text style={styles.detailTitle}>
+              {selected.speaker === 'A' ? 'Speaker 1' : 'Speaker 2'} · {selected.category}
+            </Text>
+            <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ gap: 12 }}>
+              {selected.sentences.length > 0 ? (
+                selected.sentences.map((s, i) => (
+                  <Text key={i} style={styles.detailSentence}>• {s}</Text>
+                ))
+              ) : (
+                <Text style={styles.detailSentence}>No example sentences captured.</Text>
+              )}
+            </ScrollView>
+            <Pressable
+              style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
+              onPress={() => setSelected(null)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* (no overlay in the original view) */}
 
       {/* Action Button */}
       <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
@@ -228,7 +235,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontSize: 48,
-    fontWeight: '800',
+    fontWeight: '400',
     color: DebateColors.text.primary,
     textAlign: 'center',
     letterSpacing: -1,
@@ -237,7 +244,7 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '400',
     color: DebateColors.text.tertiary,
     letterSpacing: 0.3,
   },
@@ -245,24 +252,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 24,
+    padding: 20,
+    paddingTop: 10,
   },
   heroStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 40,
-    paddingVertical: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 24,
+    marginBottom: 32,
+    paddingVertical: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   mainStat: {
     alignItems: 'center',
   },
   mainStatNumber: {
     fontSize: 56,
-    fontWeight: '900',
+    fontWeight: '400',
     color: DebateColors.text.primary,
     letterSpacing: -2,
     marginBottom: 8,
@@ -309,7 +317,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '400',
     color: '#FFFFFF',
   },
   cardHeaderText: {
@@ -317,7 +325,7 @@ const styles = StyleSheet.create({
   },
   speakerName: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '400',
     color: '#FFFFFF',
     letterSpacing: -0.5,
     marginBottom: 4,
@@ -341,7 +349,7 @@ const styles = StyleSheet.create({
   },
   miniStatValue: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '400',
     color: '#FFFFFF',
     marginBottom: 4,
     letterSpacing: -1,
@@ -353,30 +361,183 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   actions: {
-    padding: 24,
+    padding: 20,
     paddingBottom: 32,
     backgroundColor: DebateColors.background.primary,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
   actionButton: {
     backgroundColor: DebateColors.accent.purple,
-    paddingVertical: 20,
-    borderRadius: 20,
-    shadowColor: DebateColors.accent.purple,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
+    paddingVertical: 18,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   buttonPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.98 }],
   },
   actionButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.5,
   },
+  // Detail overlay
+  detailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  detailCard: {
+    width: '100%',
+    maxWidth: 720,
+    backgroundColor: DebateColors.background.secondary,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: DebateColors.background.border,
+    padding: 20,
+  },
+  detailTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: DebateColors.text.primary,
+    marginBottom: 12,
+  },
+  detailSentence: {
+    fontSize: 14,
+    color: DebateColors.text.secondary,
+    lineHeight: 20,
+  },
+  closeButton: {
+    marginTop: 18,
+    backgroundColor: DebateColors.accent.purple,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  closeButtonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  closeButtonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
 });
 
+// Bubble cluster component
+function BubbleCluster(props: {
+  title: string;
+  speaker: 'A' | 'B';
+  centerColor: string;
+  glowColor: string;
+  textColor: string;
+  categories: { category: string; sentences: string[] }[];
+  onSelect: (item: { category: string; sentences: string[] }) => void;
+}) {
+  const { title, centerColor, glowColor, textColor, categories, onSelect } = props;
+
+  // orbit animation driver
+  const rotate = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotate, { toValue: 1, duration: 9000, useNativeDriver: true })
+    ).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1600, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const pulsing = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+
+  // choose a limited subset to avoid cramming too many bubbles
+  const items = categories.slice(0, 10);
+  const radius = 110; // orbit radius
+
+  return (
+    <View style={{ alignItems: 'center', marginBottom: 24 }}>
+      <View style={{ width: '100%', maxWidth: 360, height: 260, alignItems: 'center', justifyContent: 'center' }}>
+        {/* orbit group */}
+        <Animated.View style={{ position: 'absolute', width: 1, height: 1, transform: [{ rotate: rotation }] }}>
+          {items.map((item, index) => {
+            const angle = (2 * Math.PI * index) / Math.max(1, items.length);
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            const size = 56 + (index % 3) * 8; // subtle variance
+            return (
+              <Animated.View
+                key={index}
+                style={{
+                  position: 'absolute',
+                  transform: [{ translateX: x }, { translateY: y }, { scale: pulsing }],
+                }}
+              >
+                <Pressable
+                  onPress={() => onSelect(item)}
+                  style={({ pressed }) => ({
+                    width: size,
+                    height: size,
+                    borderRadius: size / 2,
+                    backgroundColor: 'rgba(255,255,255,0.12)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.18)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    opacity: pressed ? 0.9 : 1,
+                  })}
+                >
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    paddingHorizontal: 6,
+                  }} numberOfLines={2}>
+                    {item.category}
+                  </Text>
+                </Pressable>
+              </Animated.View>
+            );
+          })}
+        </Animated.View>
+
+        {/* center bubble */}
+        <Animated.View
+          style={{
+            width: 110,
+            height: 110,
+            borderRadius: 55,
+            backgroundColor: centerColor,
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: glowColor,
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.45,
+            shadowRadius: 24,
+            elevation: 16,
+            transform: [{ scale: pulsing }],
+            borderWidth: 3,
+            borderColor: 'rgba(255,255,255,0.18)',
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '400', letterSpacing: 0.5 }}>{title}</Text>
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
