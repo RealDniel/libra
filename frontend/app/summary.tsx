@@ -89,31 +89,10 @@ export default function SummaryScreen() {
     }
   }, [pathname, session]);
 
-  // Generate AI summaries when component mounts
-  useEffect(() => {
-    if (session && speakerAggregates) {
-      generateSummaries();
-    }
-  }, []);
-
-  const generateSummaries = async () => {
-    if (!speakerAggregates) return;
-    
-    setLoadingSummaries(true);
-    try {
-      const [summaryA, summaryB] = await Promise.all([
-        fetchSummary(speakerAggregates.A, speaker1Name),
-        fetchSummary(speakerAggregates.B, speaker2Name),
-      ]);
-      setSummaries({ A: summaryA, B: summaryB });
-    } catch (error) {
-      console.error('Failed to generate summaries:', error);
-    } finally {
-      setLoadingSummaries(false);
-    }
-  };
-
-  const fetchSummary = async (transcript: string, speaker: string): Promise<string> => {
+  const fetchSummary = async (
+    transcript: string,
+    speaker: string
+  ): Promise<string> => {
     if (!transcript || !transcript.trim()) {
       return 'No transcript available.';
     }
@@ -132,6 +111,38 @@ export default function SummaryScreen() {
       return 'Error generating summary.';
     }
   };
+
+  const speaker1Name = speakerNames?.A || 'Speaker A';
+  const speaker2Name = speakerNames?.B || 'Speaker B';
+
+  const generateSummaries = async () => {
+    if (!speakerAggregates) return;
+
+    setLoadingSummaries(true);
+    try {
+      const [summaryA, summaryB] = await Promise.all([
+        fetchSummary(speakerAggregates.A, speaker1Name),
+        fetchSummary(speakerAggregates.B, speaker2Name),
+      ]);
+      setSummaries({ A: summaryA, B: summaryB });
+    } catch (error) {
+      console.error('Failed to generate summaries:', error);
+    } finally {
+      setLoadingSummaries(false);
+    }
+  };
+
+  // Generate AI summaries once aggregates are ready
+  useEffect(() => {
+    if (
+      session &&
+      speakerAggregates &&
+      (speakerAggregates.A?.trim() || speakerAggregates.B?.trim())
+    ) {
+      generateSummaries();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, speakerAggregates?.A, speakerAggregates?.B]);
 
   if (!session) {
     return null;
@@ -157,9 +168,6 @@ export default function SummaryScreen() {
     reset();
     router.replace('/');
   };
-
-  const speaker1Name = speakerNames?.A || 'Speaker A';
-  const speaker2Name = speakerNames?.B || 'Speaker B';
 
   return (
     <View style={styles.container}>
