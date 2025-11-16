@@ -31,7 +31,7 @@ def _get_model_id() -> str:
 def generate_json_from_text(text: str, system_preamble: Optional[str] = None) -> Dict[str, Any]:
 	"""
 	Send the provided text to the fine-tuned model and return parsed JSON.
-	If the model does not return valid JSON, raise a clear error.
+	Uses sentence-by-sentence classification as expected by the fine-tuned model.
 	"""
 	if not text or not text.strip():
 		raise ValueError("Empty text")
@@ -39,18 +39,43 @@ def generate_json_from_text(text: str, system_preamble: Optional[str] = None) ->
 	client = _get_openai_client()
 	model_id = _get_model_id()
 
-	system_msg = system_preamble or (
-		"You must respond with a single valid JSON object only. "
-		"No markdown, no code fences, no prose. Return strictly JSON."
+	# Split text into sentences (basic split by punctuation)
+	import re
+	sentences = [s.strip() for s in re.split(r'[.!?]+', text) if s.strip()]
+	
+	# Number the sentences
+	numbered_sentences = "\n".join([f"{i+1}. {s}" for i, s in enumerate(sentences)])
+	
+	# System prompt matching your friend's model training
+	system_msg = (
+		"Classify each sentence into exactly one label from the allowed set. "
+		"Use the full paragraph context. Only label a fallacy if clear, else 'none'. "
+		"Respond ONLY in JSON: results=[{index,label,confidence}] (confidence 0..1)."
+	)
+	
+	# Allowed labels from the fine-tuned model
+	allowed_labels = (
+		"ad hominem, ad populum, appeal to emotion, circular reasoning, equivocation, "
+		"fallacy of credibility, fallacy of extension, fallacy of logic, fallacy of relevance, "
+		"false causality, false dilemma, faulty generalization, intentional, miscellaneous, none"
+	)
+	
+	# User prompt format matching training data
+	user_msg = (
+		f"Allowed labels: {allowed_labels}.\n"
+		f"Paragraph: {text}\n"
+		f"Sentences (numbered):\n{numbered_sentences}\n\n"
+		f"Return JSON with array 'results', each item: {{index, label, confidence}}."
 	)
 
-	# Attempt to enforce JSON output via response_format when supported
+	# Call the fine-tuned model
 	response = client.chat.completions.create(
 		model=model_id,
+		temperature=0,
 		response_format={"type": "json_object"},
 		messages=[
 			{"role": "system", "content": system_msg},
-			{"role": "user", "content": text},
+			{"role": "user", "content": user_msg},
 		],
 	)
 
@@ -59,9 +84,33 @@ def generate_json_from_text(text: str, system_preamble: Optional[str] = None) ->
 		raise RuntimeError("Model returned empty content")
 
 	try:
-		return json.loads(content)
+		result = json.loads(content)
+		
+		# Transform model output to our expected format
+		# Model returns: {"results": [{"index": 1, "label": "ad hominem", "confidence": 0.95}, ...]}
+		# We need: {"fallacies": [{"type": "Ad Hominem", "quote": "...", "explanation": "..."}, ...]}
+		
+		fallacies = []
+		if "results" in result:
+			for item in result["results"]:
+				label = item.get("label", "none").strip().lower()
+				if label != "none":
+					sentence_idx = item.get("index", 1) - 1  # Convert to 0-based
+					quote = sentences[sentence_idx] if 0 <= sentence_idx < len(sentences) else text
+					
+					# Convert label to title case
+					fallacy_type = label.replace("_", " ").title()
+					
+					fallacies.append({
+						"type": fallacy_type,
+						"quote": quote,
+						"explanation": f"Detected {fallacy_type} with {int(item.get('confidence', 0) * 100)}% confidence",
+						"confidence": item.get("confidence", 0)
+					})
+		
+		return {"fallacies": fallacies}
+		
 	except json.JSONDecodeError as e:
-		# Provide actionable message for the caller
 		raise RuntimeError("Model response was not valid JSON") from e
 
 

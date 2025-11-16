@@ -84,6 +84,20 @@ export default function AnalysisScreen() {
     router.push('/summary');
   };
 
+  const fallacies = currentTurn.fallacies ?? [];
+  const factChecks = currentTurn.factChecks ?? [];
+  const verdictColor = (v: 'true' | 'false' | 'misleading' | 'unverifiable') => {
+    if (v === 'true') return DebateColors.status.true;
+    if (v === 'false') return DebateColors.status.false;
+    if (v === 'misleading') return DebateColors.status.warning;
+    return DebateColors.status.uncertain;
+  };
+  const verdictLabel = (v: 'true' | 'false' | 'misleading' | 'unverifiable') => {
+    if (v === 'true') return 'TRUE';
+    if (v === 'false') return 'FALSE';
+    if (v === 'misleading') return 'MISLEADING';
+    return 'UNCERTAIN';
+  };
   // Mock data for now (Phase 5 will use real data)
   const mockFallacies = [
     {
@@ -149,22 +163,6 @@ export default function AnalysisScreen() {
       </Animated.View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Transcript with glassmorphism */}
-        {currentTurn.transcript && (
-          <Animated.View
-            style={[
-              styles.section,
-              { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
-            ]}
-          >
-            <Text style={styles.sectionTitle}>Transcript</Text>
-            <View style={styles.glassCard}>
-              <View style={styles.accentBar} />
-              <Text style={styles.transcriptText}>{currentTurn.transcript}</Text>
-            </View>
-          </Animated.View>
-        )}
-
         {/* Logical Fallacies - Clean Cards */}
         <Animated.View
           style={[
@@ -175,10 +173,16 @@ export default function AnalysisScreen() {
           <View style={styles.sectionHeaderClean}>
             <Text style={styles.sectionTitleLarge}>Logical Fallacies</Text>
             <View style={[styles.countPill, { backgroundColor: DebateColors.status.warning }]}>
-              <Text style={styles.countPillText}>{mockFallacies.length}</Text>
+              <Text style={styles.countPillText}>{fallacies.length}</Text>
             </View>
           </View>
-          {mockFallacies.map((fallacy, index) => (
+          {fallacies.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyCardTitle}>✓ No Fallacies Detected</Text>
+              <Text style={styles.emptyCardText}>Your argument appears logically sound.</Text>
+            </View>
+          ) : (
+            fallacies.map((fallacy, index) => (
             <Animated.View
               key={fallacy.id}
               style={[
@@ -200,7 +204,7 @@ export default function AnalysisScreen() {
                 <Text style={styles.cleanCardText}>{fallacy.explanation}</Text>
               </View>
             </Animated.View>
-          ))}
+          )))}
         </Animated.View>
 
         {/* Fact Checks - Clean List */}
@@ -213,10 +217,16 @@ export default function AnalysisScreen() {
           <View style={styles.sectionHeaderClean}>
             <Text style={styles.sectionTitleLarge}>Fact Checks</Text>
             <View style={[styles.countPill, { backgroundColor: speakerColors.primary }]}>
-              <Text style={styles.countPillText}>{mockFactChecks.length}</Text>
+              <Text style={styles.countPillText}>{factChecks.length}</Text>
             </View>
           </View>
-          {mockFactChecks.map((fact, index) => (
+          {factChecks.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyCardTitle}>✓ No Claims Detected</Text>
+              <Text style={styles.emptyCardText}>No verifiable claims were made in this turn.</Text>
+            </View>
+          ) : (
+            factChecks.map((fact, index) => (
             <Animated.View
               key={fact.id}
               style={[
@@ -235,7 +245,7 @@ export default function AnalysisScreen() {
               <View
                 style={[
                   styles.cardLeftAccent,
-                  { backgroundColor: DebateColors.status[fact.verdict] },
+                  { backgroundColor: verdictColor(fact.verdict) },
                 ]}
               />
               <View style={styles.cleanCardContent}>
@@ -244,22 +254,18 @@ export default function AnalysisScreen() {
                   <View
                     style={[
                       styles.statusTag,
-                      { backgroundColor: DebateColors.status[fact.verdict] },
+                      { backgroundColor: verdictColor(fact.verdict) },
                     ]}
                   >
                     <Text style={styles.statusTagText}>
-                      {fact.verdict === 'true'
-                        ? 'TRUE'
-                        : fact.verdict === 'false'
-                        ? 'FALSE'
-                        : 'UNCERTAIN'}
+                      {verdictLabel(fact.verdict)}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.cleanCardText}>{fact.explanation}</Text>
               </View>
             </Animated.View>
-          ))}
+          )))}
         </Animated.View>
 
         {/* Bottom spacing */}
@@ -519,6 +525,25 @@ const styles = StyleSheet.create({
     color: DebateColors.text.secondary,
     textAlign: 'center',
     letterSpacing: 0.3,
+  },
+  emptyCard: {
+    backgroundColor: DebateColors.background.card,
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: DebateColors.background.border,
+    alignItems: 'center',
+  },
+  emptyCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: DebateColors.status.verified,
+    marginBottom: 8,
+  },
+  emptyCardText: {
+    fontSize: 14,
+    color: DebateColors.text.tertiary,
+    textAlign: 'center',
   },
 });
 

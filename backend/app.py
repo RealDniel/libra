@@ -83,6 +83,34 @@ def analyze_text():
     except Exception:
         return jsonify({"error": "Model analysis failed"}), 500
 
+# Fallacy detection endpoint (frontend expects this)
+@app.route("/api/fallacies", methods=["POST"])
+def detect_fallacies():
+    data = request.get_json(silent=True) or {}
+    transcript = data.get("transcript", "")
+    speaker = data.get("speaker", "A")
+    
+    if not transcript:
+        return jsonify({"error": "Missing 'transcript' in JSON body"}), 400
+    
+    try:
+        print(f"\n🔍 Analyzing fallacies for speaker {speaker}...")
+        print(f"Transcript: {transcript[:100]}...")
+        
+        # Call your fallacy model
+        result_json = generate_json_from_text(transcript)
+        
+        # The model should return fallacies in the expected format
+        # If it doesn't, transform it here
+        fallacies = result_json.get("fallacies", [])
+        
+        print(f"✅ Found {len(fallacies)} fallacies")
+        return jsonify({"fallacies": fallacies})
+    except Exception as e:
+        print(f"❌ Fallacy detection error: {e}")
+        traceback.print_exc()
+        return jsonify({"fallacies": []}), 200  # Return empty array instead of error
+
 # Fact checker function
 @app.route("/api/factcheck", methods=["POST"])
 def factcheck():
@@ -112,7 +140,38 @@ def factcheck():
         print(f"\nReturning result: {result['result']}")
         print("="*60 + "\n")
         
-        return jsonify(result)
+        # Frontend expects an array of fact-checks matching FactCheck interface
+        # Transform backend result to frontend format
+        import uuid
+        
+        # Map backend result to frontend verdict format
+        verdict_map = {
+            "true": "verified",
+            "false": "false", 
+            "unknown": "unverifiable",
+            "error": "unverifiable"
+        }
+        
+        # Transform evidence to sources format
+        sources = []
+        for ev in result.get("evidence", []):
+            if isinstance(ev, dict) and "url" in ev:
+                sources.append({
+                    "title": ev.get("title", "Source"),
+                    "url": ev.get("url", ""),
+                    "snippet": ev.get("snippet", "")
+                })
+        
+        fact_check = {
+            "id": str(uuid.uuid4()),
+            "claim": result.get("statement", text),
+            "verdict": verdict_map.get(result.get("result", "unknown").lower(), "unverifiable"),
+            "explanation": result.get("explanation", "No explanation provided"),
+            "confidence": 85,  # Default confidence score
+            "sources": sources if sources else None
+        }
+        
+        return jsonify({"factChecks": [fact_check]})
         
     except Exception as e:
         print(f"\nERROR in factcheck endpoint: {e}")

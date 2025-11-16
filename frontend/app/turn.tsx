@@ -2,7 +2,7 @@
  * Libra - Turn Screen (Recording)
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,27 @@ import {
   Pressable,
   SafeAreaView,
   Animated,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, usePathname } from 'expo-router';
 import { DebateColors } from '@/constants/theme';
 import { useDebateStore } from '@/store/debateStore';
+import { Audio } from 'expo-av';
 
 export default function TurnScreen() {
+  const currentTurn = useDebateStore((state) => state.currentTurn);
+  const updateTimer = useDebateStore((state) => state.updateTimer);
+  const setRecording = useDebateStore((state) => state.setRecording);
+  const setUploading = useDebateStore((state) => state.setUploading);
+  const setTranscript = useDebateStore((state) => state.setTranscript);
+  const setError = useDebateStore((state) => state.setError);
+  const setAnalysis = useDebateStore((state) => state.setAnalysis);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [uploading, setUploadingLocal] = useState(false);
   const { currentTurn, updateTimer, setRecording, speakerNames } = useDebateStore();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -43,6 +57,14 @@ export default function TurnScreen() {
 
   const isRecording = currentTurn.status === 'recording';
   const isIdle = currentTurn.status === 'idle';
+  const isBusy = uploading || isRecording;
+
+  // Debug logging
+  useEffect(() => {
+    console.log('📊 Turn status changed:', currentTurn.status);
+    console.log('⏱️ Time remaining:', currentTurn.timeRemaining);
+    console.log('🎙️ isRecording:', isRecording, 'isIdle:', isIdle);
+  }, [currentTurn.status, currentTurn.timeRemaining, isRecording, isIdle]);
 
   // Format time as mm:ss
   const timeRemaining = currentTurn?.timeRemaining ?? 0;
@@ -109,10 +131,54 @@ export default function TurnScreen() {
   const handleMicPress = () => {
     if (isIdle) {
       // Start recording
-      setRecording(true);
+      handleStart();
     } else if (isRecording) {
       // Stop recording
       handleStop();
+    }
+  };
+
+  const handleStart = async () => {
+    try {
+      console.log('🎤 Starting recording...');
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        console.log('❌ Mic permission denied');
+        setError('Microphone permission denied');
+        return;
+      }
+      console.log('✅ Mic permission granted');
+      // Platform-specific audio mode (web doesn't support iOS/Android settings)
+      if (Platform.OS === 'web') {
+        // Web mode - minimal settings
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: false,
+        });
+      } else {
+        // Native iOS/Android mode
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+          shouldDuckAndroid: true,
+          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: false,
+        });
+      }
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(
+        Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
+      );
+      await recording.startAsync();
+      recordingRef.current = recording;
+      console.log('✅ Recording started, updating store...');
+      setRecording(true);
+      console.log('✅ Store updated, status should be recording');
+    } catch (e: any) {
+      console.error('❌ Recording failed:', e);
+      setError(`Failed to start recording: ${e.message || 'Unknown error'}`);
     }
   };
 
@@ -120,11 +186,146 @@ export default function TurnScreen() {
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
     }
-    setRecording(false);
-    // Navigate to analysis
-    router.push('/analysis');
+    stopAndUpload();
   };
 
+  const stopAndUpload = async () => {
+    try {
+      console.log('⏹️ Stopping recording...');
+      const recording = recordingRef.current;
+      if (!recording) {
+        console.log('⚠️ No recording ref found');
+        setRecording(false);
+        return;
+      }
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI() || undefined;
+      console.log('✅ Recording stopped, URI:', uri);
+      setRecording(false, uri);
+
+      // Upload
+      console.log('📤 Starting upload...');
+      setUploading();
+      setUploadingLocal(true);
+      
+      // Web vs Native file upload handling
+      let res: Response;
+      const backendUrl = 'http://localhost:5001/api/transcribe';
+      console.log('📡 Uploading to:', backendUrl);
+      
+      if (Platform.OS === 'web' && uri) {
+        // Web: fetch the blob and send it as a file
+        console.log('🌐 Web upload: fetching blob...');
+        const blobRes = await fetch(uri);
+        const blob = await blobRes.blob();
+        console.log('📦 Blob size:', blob.size, 'type:', blob.type);
+        
+        const form = new FormData();
+        form.append('audio', blob, 'turn.webm'); // Web records as webm
+        
+        res = await fetch(backendUrl, {
+          method: 'POST',
+          body: form,
+        });
+      } else {
+        // Native: use RN FormData shim
+        const form = new FormData();
+        form.append('audio', {
+          // @ts-ignore RN FormData file shim
+          uri,
+          name: 'turn.m4a',
+          type: 'audio/m4a',
+        } as any);
+        
+        res = await fetch(backendUrl, {
+          method: 'POST',
+          body: form,
+        });
+      }
+      const text = await res.text();
+      console.log('📥 Backend response:', res.status, text.substring(0, 100));
+      if (!res.ok) {
+        try {
+          const json = JSON.parse(text);
+          console.error('❌ Transcription error:', json.error);
+          setError(json.error || 'Transcription failed');
+        } catch {
+          console.error('❌ Transcription failed (non-JSON response)');
+          setError('Transcription failed');
+        }
+        setUploadingLocal(false);
+        return;
+      }
+      const data = JSON.parse(text);
+      const transcript = data.transcript || '';
+      console.log('✅ Transcript received:', transcript.substring(0, 50) + '...');
+      setTranscript(transcript);
+      
+      // Analyze: fallacies then fact-checks
+      console.log('🔍 Running analysis...');
+      const fallacies = await analyzeFallacies(transcript, currentTurn.speaker);
+      const factChecks = await factcheckTranscript(transcript);
+      console.log('✅ Analysis complete. Fallacies:', fallacies.length, 'Fact checks:', factChecks.length);
+      setAnalysis(fallacies, factChecks);
+      setUploadingLocal(false);
+
+      // Go to analysis screen for the rest of the pipeline
+      console.log('🚀 Navigating to analysis...');
+      router.push('/analysis');
+    } catch (e: any) {
+      console.error('❌ Upload/analysis failed:', e);
+      setUploadingLocal(false);
+      setError(`Failed: ${e.message || 'Unknown error'}`);
+    } finally {
+      recordingRef.current = null;
+    }
+  };
+
+  const analyzeFallacies = async (text: string, speaker: 'A' | 'B') => {
+    try {
+      const res = await fetch('http://localhost:5001/api/fallacies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text, speaker }),
+      });
+      if (!res.ok) {
+        return [];
+      }
+      const data = await res.json();
+      return Array.isArray(data.fallacies) ? data.fallacies : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const factcheckTranscript = async (text: string) => {
+    try {
+      const res = await fetch('http://localhost:5001/api/factcheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        console.log('❌ Factcheck API failed:', res.status);
+        return [];
+      }
+      const data = await res.json();
+      console.log('📊 Factcheck response:', data);
+      
+      // Accept either a single result or list; normalize to array of FactCheck
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data.factChecks)) {
+        console.log(`✅ Returning ${data.factChecks.length} fact checks`);
+        return data.factChecks;
+      }
+      if (data.claim || data.verdict) return [data];
+      console.log('⚠️ No fact checks found in response');
+      return [];
+    } catch (e) {
+      console.error('❌ Factcheck error:', e);
+      return [];
+    }
+  };
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -167,9 +368,10 @@ export default function TurnScreen() {
                   backgroundColor: colors.primary,
                   shadowColor: colors.glow,
                 },
-                pressed && styles.micButtonPressed,
+                pressed && !isBusy && styles.micButtonPressed,
               ]}
               onPress={handleMicPress}
+              disabled={uploading}
             >
               <Animated.View
                 style={[
@@ -185,7 +387,7 @@ export default function TurnScreen() {
                   )}
                 </View>
                 <Text style={styles.micLabel}>
-                  {isIdle ? 'Start' : 'Stop & Analyze'}
+                  {uploading ? 'Uploading...' : isIdle ? 'Start' : 'Stop & Analyze'}
                 </Text>
               </Animated.View>
             </Pressable>
@@ -194,7 +396,9 @@ export default function TurnScreen() {
           {/* Status */}
           <View style={styles.footer}>
             <Text style={styles.status}>
-              {isRecording
+              {uploading
+                ? 'Uploading audio...'
+                : isRecording
                 ? 'Recording in progress... Press to stop'
                 : 'Press start to begin your turn'}
             </Text>

@@ -17,6 +17,7 @@ interface DebateStore {
   // Session state
   session: DebateSession | null;
   currentTurn: CurrentTurn | null;
+  speakerAggregates?: { A: string; B: string };
 
   // Config
   turnDurationSeconds: number;
@@ -33,6 +34,9 @@ interface DebateStore {
   setRecording: (isRecording: boolean, audioUri?: string) => void;
   setUploading: () => void;
   setTranscript: (transcript: string) => void;
+  setFallacies: (fallacies: Fallacy[]) => void;
+  setFactChecks: (factChecks: FactCheck[]) => void;
+  appendToAggregate: (speaker: Speaker, text: string) => void;
   setAnalysis: (fallacies: Fallacy[], factChecks: FactCheck[]) => void;
   setError: (error: string) => void;
   completeTurn: () => void;
@@ -47,6 +51,7 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
   currentTurn: null,
   speakerNames: { A: 'Speaker A', B: 'Speaker B' },
   turnDurationSeconds: 60,
+  speakerAggregates: { A: '', B: '' },
 
   // Start a new debate session
   startDebate: () => {
@@ -145,6 +150,46 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
     });
   },
 
+  // Set fallacies on the current turn
+  setFallacies: (fallacies: Fallacy[]) => {
+    set((state) => {
+      if (!state.currentTurn) return state;
+      return {
+        currentTurn: {
+          ...state.currentTurn,
+          fallacies,
+        },
+      };
+    });
+  },
+
+  // Set fact checks on the current turn
+  setFactChecks: (factChecks: FactCheck[]) => {
+    set((state) => {
+      if (!state.currentTurn) return state;
+      return {
+        currentTurn: {
+          ...state.currentTurn,
+          factChecks,
+        },
+      };
+    });
+  },
+
+  // Append text to a speaker's cumulative transcript
+  appendToAggregate: (speaker: Speaker, text: string) => {
+    set((state) => {
+      const agg = state.speakerAggregates ?? { A: '', B: '' };
+      const prev = agg[speaker] || '';
+      return {
+        speakerAggregates: {
+          ...agg,
+          [speaker]: prev ? `${prev}\n${text}` : text,
+        },
+      };
+    });
+  },
+
   // Set analysis results
   setAnalysis: (fallacies: Fallacy[], factChecks: FactCheck[]) => {
     set((state) => {
@@ -152,6 +197,8 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
       return {
         currentTurn: {
           ...state.currentTurn,
+          fallacies,
+          factChecks,
           status: 'complete',
         },
       };
@@ -189,11 +236,22 @@ export const useDebateStore = create<DebateStore>((set, get) => ({
         createdAt: new Date(),
       };
 
+      // Update session turns and also append transcript to speaker aggregate
+      const agg = state.speakerAggregates ?? { A: '', B: '' };
+      const speaker = state.currentTurn.speaker;
+      const toAppend = state.currentTurn.transcript || '';
+      const prev = agg[speaker] || '';
+
       return {
         session: {
           ...state.session,
           turns: [...state.session.turns, turn],
         },
+        speakerAggregates: {
+          ...agg,
+          [speaker]: toAppend ? (prev ? `${prev}\n${toAppend}` : toAppend) : prev,
+        },
+        currentTurn: state.currentTurn, // unchanged here
       };
     });
   },
